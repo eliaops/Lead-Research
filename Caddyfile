@@ -2,6 +2,9 @@ bidtogo.ca {
 	handle /api/agent/* {
 		reverse_proxy scraper-api:8001
 	}
+	handle /api/analysis/* {
+		reverse_proxy scraper-api:8001
+	}
 	handle /api/scraper/* {
 		reverse_proxy scraper-api:8001
 	}

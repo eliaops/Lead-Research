@@ -36,7 +36,9 @@ app.add_middleware(
 )
 
 from src.api.agent_sync import router as agent_router
+from src.api.quick_analysis import router as analysis_router
 app.include_router(agent_router)
+app.include_router(analysis_router)
 
 
 # ─── Auth Dependency ────────────────────────────────────────

@@ -583,7 +583,7 @@ function OpportunitiesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          {opp.hasIntelligence && (
+                          {opp.hasIntelligence ? (
                             <Link
                               href={`/dashboard/opportunities/${opp.id}`}
                               className="inline-flex items-center gap-1 rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition-colors whitespace-nowrap"
@@ -591,6 +591,14 @@ function OpportunitiesPage() {
                             >
                               <Sparkles className="h-2.5 w-2.5" />
                               AI Report
+                            </Link>
+                          ) : (
+                            <Link
+                              href={`/dashboard/opportunities/${opp.id}#analyze`}
+                              className="inline-flex items-center gap-1 rounded-md border border-dashed border-muted-foreground/30 px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/50 transition-colors whitespace-nowrap"
+                            >
+                              <Sparkles className="h-2.5 w-2.5" />
+                              Analyze
                             </Link>
                           )}
                           <Link

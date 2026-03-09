@@ -80,6 +80,8 @@ export default function OpportunityDetailPage() {
   // eslint-disable-next-line
   const [intel, setIntel] = useState<any>(null);
   const [intelLoading, setIntelLoading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const fetchDetail = useCallback(() => {
     setLoading(true);
@@ -110,6 +112,27 @@ export default function OpportunityDetailPage() {
     fetchDetail();
     fetchIntelligence();
   }, [fetchDetail, fetchIntelligence]);
+
+  async function handleAnalyze() {
+    setAnalyzing(true);
+    setAnalysisError(null);
+    try {
+      const res = await fetch("/api/intelligence/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opportunityId: id, mode: "quick" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Analysis failed" }));
+        throw new Error(err.detail || err.error || "Analysis failed");
+      }
+      fetchIntelligence();
+    } catch (err) {
+      setAnalysisError(err instanceof Error ? err.message : "Analysis failed");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   async function handleWorkflowChange(status: WorkflowStatus) {
     setUpdatingWorkflow(true);
@@ -298,55 +321,94 @@ export default function OpportunityDetailPage() {
         </CardContent>
       </Card>
 
-      {/* AI Intelligence Banner — prominent CTA when report exists */}
-      {intel?.intelligence && !intelLoading && (
-        <Card className="border-2 border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50">
+      {/* AI Intelligence Banner */}
+      {!intelLoading && (
+        <Card className={`border-2 ${intel?.intelligence ? "border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50" : "border-dashed border-muted-foreground/30 bg-muted/20"}`}>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-full border-2 text-lg font-bold ${
-                  (intel.intelligence.feasibilityScore ?? intel.intelligence.feasibility_score ?? 0) >= 70
-                    ? "border-emerald-400 text-emerald-600 bg-emerald-50"
-                    : (intel.intelligence.feasibilityScore ?? intel.intelligence.feasibility_score ?? 0) >= 40
-                    ? "border-amber-400 text-amber-600 bg-amber-50"
-                    : "border-red-400 text-red-600 bg-red-50"
-                }`}>
-                  {intel.intelligence.feasibilityScore ?? intel.intelligence.feasibility_score ?? "—"}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-semibold text-blue-900">AI Intelligence Report Available</span>
-                    {(() => {
-                      const rec = intel.intelligence.recommendationStatus ?? intel.intelligence.recommendation_status;
-                      if (!rec) return null;
-                      const colors: Record<string, string> = {
-                        strongly_pursue: "bg-emerald-100 text-emerald-800",
-                        pursue: "bg-green-100 text-green-800",
-                        review_carefully: "bg-amber-100 text-amber-800",
-                        low_probability: "bg-orange-100 text-orange-800",
-                        skip: "bg-red-100 text-red-800",
-                      };
-                      return (
-                        <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${colors[rec] || "bg-gray-100"}`}>
-                          {rec.replace(/_/g, " ").toUpperCase()}
-                        </span>
-                      );
-                    })()}
+            {intel?.intelligence ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-full border-2 text-lg font-bold ${
+                    (intel.intelligence.feasibilityScore ?? intel.intelligence.feasibility_score ?? 0) >= 70
+                      ? "border-emerald-400 text-emerald-600 bg-emerald-50"
+                      : (intel.intelligence.feasibilityScore ?? intel.intelligence.feasibility_score ?? 0) >= 40
+                      ? "border-amber-400 text-amber-600 bg-amber-50"
+                      : "border-red-400 text-red-600 bg-red-50"
+                  }`}>
+                    {intel.intelligence.feasibilityScore ?? intel.intelligence.feasibility_score ?? "—"}
                   </div>
-                  <p className="text-xs text-blue-700 mt-0.5">
-                    {intel.intelligence.analysisModel ?? intel.intelligence.analysis_model === "gpt-4o-mini" ? "GPT-4o powered analysis" : "Rule-based analysis"} with feasibility scoring, scope extraction, and business recommendations.
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-semibold text-blue-900">AI Intelligence Report</span>
+                      {(() => {
+                        const rec = intel.intelligence.recommendationStatus ?? intel.intelligence.recommendation_status;
+                        if (!rec) return null;
+                        const colors: Record<string, string> = {
+                          strongly_pursue: "bg-emerald-100 text-emerald-800",
+                          pursue: "bg-green-100 text-green-800",
+                          review_carefully: "bg-amber-100 text-amber-800",
+                          low_probability: "bg-orange-100 text-orange-800",
+                          skip: "bg-red-100 text-red-800",
+                        };
+                        return (
+                          <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${colors[rec] || "bg-gray-100"}`}>
+                            {rec.replace(/_/g, " ").toUpperCase()}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    <p className="text-xs text-blue-700 mt-0.5">
+                      {(intel.intelligence.analysisModel ?? intel.intelligence.analysis_model) === "fallback_rule_based"
+                        ? "Rule-based analysis"
+                        : "GPT-4o powered analysis"} — feasibility scoring, scope extraction, business recommendations
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={analyzing}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors disabled:opacity-50"
+                  >
+                    {analyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    Re-analyze
+                  </button>
+                  <a
+                    href="#ai-intelligence"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    View Report
+                  </a>
                 </div>
               </div>
-              <a
-                href="#ai-intelligence"
-                className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors shrink-0"
-              >
-                <Sparkles className="h-4 w-4" />
-                View Full Report
-              </a>
-            </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/30 bg-muted/30">
+                    <Sparkles className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-semibold">No AI Analysis Yet</span>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Run Quick Analysis to get feasibility scoring, scope extraction, qualification requirements, and business recommendations.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleAnalyze}
+                  disabled={analyzing}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50 shrink-0"
+                >
+                  {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {analyzing ? "Analyzing..." : "Run Quick Analysis"}
+                </button>
+              </div>
+            )}
+            {analysisError && (
+              <p className="mt-2 text-xs text-destructive">{analysisError}</p>
+            )}
           </CardContent>
         </Card>
       )}
