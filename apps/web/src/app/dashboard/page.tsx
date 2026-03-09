@@ -58,7 +58,7 @@ export default function DashboardPage() {
         const body = await res.json().catch(() => ({}));
         setCrawlMessage(`Error: ${body.error || res.statusText}`);
       } else {
-        setCrawlMessage("Crawler dispatched — results will appear shortly.");
+        setCrawlMessage("Crawler dispatched. Check Logs page to track progress.");
       }
     } catch {
       setCrawlMessage("Failed to connect to crawler service.");
@@ -170,6 +170,48 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* ─── Last Crawl Run Status ─── */}
+      {stats.lastCrawlRun && (
+        <Card className={`border-l-4 ${
+          stats.lastCrawlRun.status === "completed" ? "border-l-emerald-500" :
+          stats.lastCrawlRun.status === "failed" ? "border-l-red-500" :
+          stats.lastCrawlRun.status === "running" ? "border-l-blue-500" :
+          "border-l-amber-400"
+        }`}>
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Activity className={`h-4 w-4 ${
+                  stats.lastCrawlRun.status === "completed" ? "text-emerald-600" :
+                  stats.lastCrawlRun.status === "failed" ? "text-red-600" :
+                  stats.lastCrawlRun.status === "running" ? "text-blue-600 animate-pulse" :
+                  "text-amber-500"
+                }`} />
+                <div>
+                  <p className="text-sm font-medium">
+                    Last crawl: <span className="capitalize">{stats.lastCrawlRun.status}</span>
+                    {" · "}
+                    <span className="text-muted-foreground">{stats.lastCrawlRun.sourceName}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {stats.lastCrawlRun.opportunitiesFound} found, {stats.lastCrawlRun.opportunitiesCreated} new
+                    {stats.lastCrawlRun.startedAt && (
+                      <> · {new Date(stats.lastCrawlRun.startedAt).toLocaleString()}</>
+                    )}
+                    {stats.lastCrawlRun.errorMessage && (
+                      <span className="text-red-600"> · {stats.lastCrawlRun.errorMessage.slice(0, 80)}</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <Link href="/dashboard/logs" className="text-xs font-medium text-primary hover:underline whitespace-nowrap">
+                View logs →
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ─── Primary Intelligence Cards ─── */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">

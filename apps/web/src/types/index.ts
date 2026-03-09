@@ -125,6 +125,17 @@ export interface DashboardStats {
     skipCount: number;
     avgFeasibility: number;
   };
+  lastCrawlRun?: {
+    id: string;
+    sourceName: string;
+    status: RunStatus;
+    startedAt: string | null;
+    completedAt: string | null;
+    opportunitiesFound: number;
+    opportunitiesCreated: number;
+    errorMessage: string | null;
+    triggeredBy: string;
+  } | null;
 }
 
 export interface OpportunitySummary {

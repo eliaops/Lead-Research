@@ -74,6 +74,12 @@ export async function GET() {
       prisma.sourceRun.count(),
     ]);
 
+    // Last crawl run info
+    const lastRun = await prisma.sourceRun.findFirst({
+      orderBy: { createdAt: "desc" },
+      include: { source: { select: { name: true } } },
+    });
+
     // Intelligence stats — fetched separately with fallback for resilience
     let intelStats = { analyzedCount: 0, pursueCount: 0, reviewCount: 0, skipCount: 0, avgFeasibility: 0 };
     try {
@@ -184,6 +190,19 @@ export async function GET() {
         crawlRunsLast24h,
         totalCrawlRuns: sourceRunsTotal,
       },
+      lastCrawlRun: lastRun
+        ? {
+            id: lastRun.id,
+            sourceName: lastRun.source.name,
+            status: lastRun.status,
+            startedAt: lastRun.startedAt?.toISOString() ?? null,
+            completedAt: lastRun.completedAt?.toISOString() ?? null,
+            opportunitiesFound: lastRun.opportunitiesFound,
+            opportunitiesCreated: lastRun.opportunitiesCreated,
+            errorMessage: lastRun.errorMessage ?? null,
+            triggeredBy: lastRun.triggeredBy,
+          }
+        : null,
       intelligence: intelStats,
     };
 

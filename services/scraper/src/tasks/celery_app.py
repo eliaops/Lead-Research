@@ -65,4 +65,4 @@ celery_app.conf.beat_schedule = {
     },
 }
 
-celery_app.autodiscover_tasks(["src.tasks"])
+celery_app.autodiscover_tasks(["src.tasks"], related_name="crawl_tasks")
