@@ -43,8 +43,8 @@ Thumbs.db
 # Database
 *.sql.bak
 
-# Logs
-logs/
+# Logs (top-level only, not app route directories)
+/logs/
 *.log
 
 # Docker
