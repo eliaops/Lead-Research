@@ -47,3 +47,8 @@ def get_db() -> Generator[Session, None, None]:
         raise
     finally:
         session.close()
+
+
+def get_db_session() -> Session:
+    """Return a raw session. Caller is responsible for commit/close."""
+    return SessionLocal()
