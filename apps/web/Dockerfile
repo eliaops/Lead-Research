@@ -1,6 +1,6 @@
 # ── Stage 1: Install dependencies ──
 FROM node:20-alpine AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml* ./
@@ -8,6 +8,7 @@ RUN corepack enable pnpm && pnpm install --frozen-lockfile 2>/dev/null || pnpm i
 
 # ── Stage 2: Build the Next.js app ──
 FROM node:20-alpine AS builder
+RUN apk add --no-cache openssl
 WORKDIR /app
 
 ARG DATABASE_URL="postgresql://placeholder:placeholder@placeholder:5432/placeholder"
@@ -16,12 +17,14 @@ ENV DATABASE_URL=${DATABASE_URL}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-RUN corepack enable pnpm \
+RUN mkdir -p public \
+    && corepack enable pnpm \
     && npx prisma generate \
     && pnpm build
 
 # ── Stage 3: Production runner ──
 FROM node:20-alpine AS runner
+RUN apk add --no-cache openssl
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -34,8 +37,6 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 USER nextjs
 
