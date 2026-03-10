@@ -29,6 +29,7 @@ import {
   Radio,
   CheckCircle2,
   Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,8 @@ export default function OpportunityDetailPage() {
   const [intelLoading, setIntelLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [intelError, setIntelError] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchDetail = useCallback(() => {
     setLoading(true);
@@ -101,10 +104,11 @@ export default function OpportunityDetailPage() {
 
   const fetchIntelligence = useCallback(() => {
     setIntelLoading(true);
+    setIntelError(false);
     fetch(`/api/intelligence/${id}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setIntel(data))
-      .catch(() => {})
+      .catch(() => setIntelError(true))
       .finally(() => setIntelLoading(false));
   }, [id]);
 
@@ -126,6 +130,11 @@ export default function OpportunityDetailPage() {
         const err = await res.json().catch(() => ({ error: "Analysis failed" }));
         throw new Error(err.detail || err.error || "Analysis failed");
       }
+      const result = await res.json().catch(() => ({}));
+      if (result.status === "failed") {
+        throw new Error(result.message || "Analysis failed — model or API error");
+      }
+      await new Promise((r) => setTimeout(r, 1200));
       fetchIntelligence();
     } catch (err) {
       setAnalysisError(err instanceof Error ? err.message : "Analysis failed");
@@ -145,7 +154,8 @@ export default function OpportunityDetailPage() {
       if (!res.ok) throw new Error("Failed to update");
       fetchDetail();
     } catch {
-      alert("Failed to update workflow status.");
+      setActionError("Failed to update workflow status.");
+      setTimeout(() => setActionError(null), 5000);
     } finally {
       setUpdatingWorkflow(false);
     }
@@ -164,7 +174,8 @@ export default function OpportunityDetailPage() {
       setNewNote("");
       fetchDetail();
     } catch {
-      alert("Failed to save note. Please try again.");
+      setActionError("Failed to save note. Please try again.");
+      setTimeout(() => setActionError(null), 5000);
     } finally {
       setSubmittingNote(false);
     }
@@ -321,8 +332,15 @@ export default function OpportunityDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Action feedback toast */}
+      {actionError && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive animate-fade-in">
+          {actionError}
+        </div>
+      )}
+
       {/* AI Intelligence Banner */}
-      {!intelLoading && (
+      {!intelLoading && !intelError && (
         <Card className={`border-2 ${intel?.intelligence ? "border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50" : "border-dashed border-muted-foreground/30 bg-muted/20"}`}>
           <CardContent className="p-4">
             {intel?.intelligence ? (
@@ -358,11 +376,17 @@ export default function OpportunityDetailPage() {
                         );
                       })()}
                     </div>
-                    <p className="text-xs text-blue-700 mt-0.5">
-                      {(intel.intelligence.analysisModel ?? intel.intelligence.analysis_model) === "fallback_rule_based"
-                        ? "Rule-based analysis"
-                        : "GPT-4o powered analysis"} — feasibility scoring, scope extraction, business recommendations
-                    </p>
+                    {(() => {
+                      const summ = intel.intelligence.intelligenceSummary ?? intel.intelligence.intelligence_summary;
+                      const v = summ?.one_line_verdict;
+                      return v
+                        ? <p className="text-xs text-blue-800 mt-0.5 font-medium">{v}</p>
+                        : <p className="text-xs text-blue-700 mt-0.5">
+                            {(intel.intelligence.analysisModel ?? intel.intelligence.analysis_model) === "fallback_rule_based"
+                              ? "Rule-based analysis"
+                              : "AI-powered analysis"} — feasibility scoring, scope, recommendations
+                          </p>;
+                    })()}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -409,6 +433,17 @@ export default function OpportunityDetailPage() {
             {analysisError && (
               <p className="mt-2 text-xs text-destructive">{analysisError}</p>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {intelError && !intelLoading && (
+        <Card className="border-dashed border-amber-300 bg-amber-50/30">
+          <CardContent className="p-4 flex items-center justify-between">
+            <p className="text-sm text-amber-800">Could not load AI intelligence data.</p>
+            <Button variant="outline" size="sm" onClick={fetchIntelligence}>
+              Retry
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -757,19 +792,20 @@ function MetaRow({
   );
 }
 
-/* eslint-disable */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 function IntelligencePanel({ data }: { data: any }) {
+  const [showDetails, setShowDetails] = useState(false);
+
   if (!data) return null;
 
-  // Handle both camelCase (Prisma) and snake_case (raw SQL) keys
-  const summary = data.intelligenceSummary || data.intelligence_summary || {};
-  const feasibility = summary.feasibility_assessment || {};
-  const china = summary.china_sourcing_analysis || {};
-  const tech = data.technicalRequirements || data.technical_requirements || summary.technical_requirements || {};
-  const quals = data.qualificationReqs || data.qualification_reqs || summary.qualification_requirements || {};
-  const dates = data.criticalDates || data.critical_dates || summary.critical_dates || {};
-  const risks = data.riskFactors || data.risk_factors || summary.risk_factors || [];
-  const wcr = summary.window_covering_relevance || {};
+  const summary: any = data.intelligenceSummary || data.intelligence_summary || {};
+  const feasibility: any = summary.feasibility_assessment || {};
+  const china: any = summary.china_sourcing_analysis || {};
+  const tech: any = data.technicalRequirements || data.technical_requirements || summary.technical_requirements || {};
+  const quals: any = data.qualificationReqs || data.qualification_reqs || summary.qualification_requirements || {};
+  const dates: any = data.criticalDates || data.critical_dates || summary.critical_dates || {};
+  const risks: string[] = data.riskFactors || data.risk_factors || summary.risk_factors || [];
+  const wcr: any = summary.window_covering_relevance || {};
 
   const recColors: Record<string, string> = {
     strongly_pursue: "bg-emerald-100 text-emerald-800 border-emerald-300",
@@ -779,68 +815,136 @@ function IntelligencePanel({ data }: { data: any }) {
     skip: "bg-red-100 text-red-800 border-red-300",
   };
 
-  const feasScore = data.feasibilityScore ?? data.feasibility_score ?? feasibility.feasibility_score;
-  const recommendation = data.recommendationStatus ?? data.recommendation_status ?? feasibility.recommendation;
+  const feasScore: number | undefined = data.feasibilityScore ?? data.feasibility_score ?? feasibility.feasibility_score;
+  const recommendation: string | undefined = data.recommendationStatus ?? data.recommendation_status ?? feasibility.recommendation;
+  const verdict: string | undefined = summary.one_line_verdict;
+  const overview: string | undefined = data.projectOverview || data.project_overview || summary.project_overview;
+  const scopeType: string | undefined = data.scopeType || data.scope_type || summary.scope_type;
+  const advantages: string[] = feasibility.key_advantages || [];
+  const concerns: string[] = feasibility.key_concerns || [];
+  const recAction: string | undefined = summary.recommended_action || data.businessFitExplanation || data.business_fit_explanation;
+  const analyzedAt: string | undefined = data.analyzedAt || data.analyzed_at;
+  const model: string | undefined = data.analysisModel || data.analysis_model;
 
   return (
-    <Card className="border-2 border-blue-200 bg-blue-50/30">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <svg className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-            </svg>
-            AI Tender Intelligence
-          </CardTitle>
-          {(data.analyzedAt || data.analyzed_at) && (
-            <span className="text-xs text-muted-foreground">
-              Analyzed {new Date(data.analyzedAt || data.analyzed_at).toLocaleDateString()}
-            </span>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Feasibility Score & Recommendation */}
-        <div className="flex items-center gap-4 p-4 rounded-lg bg-white border">
+    <Card className="border-2 border-blue-200 overflow-hidden">
+      {/* ── TIER 1: Decision Header ── */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5">
+        <div className="flex items-start gap-5">
           {feasScore != null && (
-            <div className="text-center">
-              <div className={`text-3xl font-bold ${
-                feasScore >= 70 ? "text-emerald-600" : feasScore >= 40 ? "text-amber-600" : "text-red-600"
-              }`}>
-                {feasScore}
-              </div>
-              <div className="text-xs text-muted-foreground">Feasibility</div>
+            <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border-2 text-2xl font-bold ${
+              feasScore >= 70 ? "border-emerald-400 text-emerald-600 bg-emerald-50"
+              : feasScore >= 40 ? "border-amber-400 text-amber-600 bg-amber-50"
+              : "border-red-400 text-red-600 bg-red-50"
+            }`}>
+              {feasScore}
             </div>
           )}
-          {recommendation && (
-            <div className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium ${recColors[recommendation] || "bg-gray-100"}`}>
-              {recommendation.replace(/_/g, " ").toUpperCase()}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Sparkles className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-semibold text-blue-900">AI Intelligence Report</span>
+              {recommendation && (
+                <span className={`rounded-md border px-2.5 py-0.5 text-xs font-bold ${recColors[recommendation] || "bg-gray-100"}`}>
+                  {recommendation.replace(/_/g, " ").toUpperCase()}
+                </span>
+              )}
+              {scopeType && scopeType !== "unclear" && (
+                <Badge variant="outline" className="text-[10px]">
+                  {scopeType.replace(/_/g, " ")}
+                </Badge>
+              )}
+            </div>
+            {verdict && (
+              <p className="mt-1.5 text-sm text-blue-800 leading-snug">{verdict}</p>
+            )}
+            {!verdict && overview && (
+              <p className="mt-1.5 text-sm text-blue-800 leading-snug line-clamp-2">{overview}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <CardContent className="p-5 space-y-5">
+        {/* ── TIER 2: Key Intelligence ── */}
+        {verdict && overview && (
+          <div className="rounded-lg border bg-white p-4">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Project Summary</h4>
+            <p className="text-sm leading-relaxed">{overview}</p>
+          </div>
+        )}
+
+        {/* Advantages vs Concerns — side by side */}
+        {(advantages.length > 0 || concerns.length > 0) && (
+          <div className="grid gap-4 md:grid-cols-2">
+            {advantages.length > 0 && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+                <h4 className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-2">Why It Fits</h4>
+                <ul className="space-y-1.5">
+                  {advantages.map((a, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-emerald-800">
+                      <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" /> {a}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {concerns.length > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4">
+                <h4 className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-2">Key Concerns</h4>
+                <ul className="space-y-1.5">
+                  {concerns.map((c, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-amber-800">
+                      <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" /> {c}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── TIER 3: Decision Factors ── */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Timeline */}
+          {(dates.site_visit_date || dates.pre_bid_meeting || dates.project_start || dates.project_completion || dates.timeline_notes) && (
+            <div className="rounded-lg border bg-white p-4">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Timeline</h4>
+              <div className="space-y-1 text-sm">
+                {dates.site_visit_date && <p><span className="text-muted-foreground">Site Visit:</span> {dates.site_visit_date}</p>}
+                {dates.pre_bid_meeting && <p><span className="text-muted-foreground">Pre-Bid:</span> {dates.pre_bid_meeting}</p>}
+                {dates.project_start && <p><span className="text-muted-foreground">Start:</span> {dates.project_start}</p>}
+                {dates.project_completion && <p><span className="text-muted-foreground">Completion:</span> {dates.project_completion}</p>}
+                {dates.timeline_notes && (
+                  <p className="text-xs text-amber-700 mt-1 flex items-start gap-1">
+                    <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                    {dates.timeline_notes}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* China Sourcing */}
+          {china.explanation && (
+            <div className="rounded-lg border bg-white p-4">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">China Sourcing</h4>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className={`inline-block h-2.5 w-2.5 rounded-full ${china.viable ? "bg-green-500" : "bg-red-500"}`} />
+                <span className="text-sm font-medium">{china.viable ? "Viable" : "Not Viable"}</span>
+              </div>
+              <p className="text-sm text-muted-foreground">{china.explanation}</p>
+              {china.lead_time_concern && (
+                <p className="text-xs text-muted-foreground mt-1">{china.lead_time_concern}</p>
+              )}
             </div>
           )}
         </div>
 
-        {/* Project Overview */}
-        {(data.projectOverview || data.project_overview || summary.project_overview) && (
-          <Section title="Project Overview">
-            <p className="text-sm">{data.projectOverview || data.project_overview || summary.project_overview}</p>
-          </Section>
-        )}
-
-        {/* Scope of Work */}
-        {(data.scopeOfWork || data.scope_of_work || summary.scope_of_work) && (
-          <Section title="Scope of Work">
-            <p className="text-sm">{data.scopeOfWork || data.scope_of_work || summary.scope_of_work}</p>
-            {(data.scopeType || data.scope_type || summary.scope_type) && (
-              <Badge variant="outline" className="mt-2 text-xs">
-                {(data.scopeType || data.scope_type || summary.scope_type).replace(/_/g, " ")}
-              </Badge>
-            )}
-          </Section>
-        )}
-
-        {/* Window Covering Relevance */}
+        {/* Industry Relevance */}
         {wcr.relevance_explanation && (
-          <Section title="Industry Relevance">
+          <div className="rounded-lg border bg-white p-4">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Industry Relevance</h4>
             <p className="text-sm">{wcr.relevance_explanation}</p>
             {wcr.specific_products?.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
@@ -854,160 +958,127 @@ function IntelligencePanel({ data }: { data: any }) {
                 Est. scope: {wcr.estimated_scope_percentage}% window coverings/textiles
               </p>
             )}
-          </Section>
+          </div>
         )}
 
-        {/* Technical Requirements */}
-        {tech.materials?.length > 0 && (
-          <Section title="Technical Requirements">
-            {tech.materials.length > 0 && (
-              <div className="mb-2">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Materials</p>
-                <div className="flex flex-wrap gap-1">
-                  {tech.materials.map((m: string) => (
-                    <Badge key={m} variant="outline" className="text-xs">{m}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            {tech.measurements && <p className="text-sm"><strong>Measurements:</strong> {tech.measurements}</p>}
-            {tech.compliance?.length > 0 && (
-              <div className="mt-2">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Compliance</p>
-                <div className="flex flex-wrap gap-1">
-                  {tech.compliance.map((c: string) => (
-                    <Badge key={c} variant="outline" className="text-xs">{c}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Section>
+        {/* Recommended Action */}
+        {recAction && (
+          <div className="rounded-lg border-2 border-blue-300 bg-blue-50 p-4">
+            <h4 className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-1">Next Step</h4>
+            <p className="text-sm text-blue-900">{recAction}</p>
+          </div>
         )}
 
-        {/* Qualification Requirements */}
-        {(quals.certifications?.length > 0 || quals.bonding || quals.experience_years !== "not specified") && (
-          <Section title="Qualification Requirements">
-            <div className="space-y-1 text-sm">
-              {quals.experience_years && quals.experience_years !== "not specified" && (
-                <p><strong>Experience:</strong> {quals.experience_years}</p>
-              )}
-              {quals.bonding && <p><strong>Bonding:</strong> {quals.bonding}</p>}
-              {quals.insurance_min && quals.insurance_min !== "not specified" && (
-                <p><strong>Insurance:</strong> {quals.insurance_min}</p>
-              )}
-              {quals.labor_requirements && <p><strong>Labor:</strong> {quals.labor_requirements}</p>}
-              {quals.certifications?.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {quals.certifications.map((c: string) => (
-                    <Badge key={c} variant="outline" className="text-xs">{c}</Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-          </Section>
-        )}
-
-        {/* Critical Dates */}
-        {(dates.site_visit_date || dates.pre_bid_meeting || dates.project_start || dates.project_completion) && (
-          <Section title="Critical Dates">
-            <div className="space-y-1 text-sm">
-              {dates.site_visit_date && <p><strong>Site Visit:</strong> {dates.site_visit_date}</p>}
-              {dates.pre_bid_meeting && <p><strong>Pre-Bid Meeting:</strong> {dates.pre_bid_meeting}</p>}
-              {dates.project_start && <p><strong>Project Start:</strong> {dates.project_start}</p>}
-              {dates.project_completion && <p><strong>Completion:</strong> {dates.project_completion}</p>}
-              {dates.timeline_notes && <p className="text-muted-foreground">{dates.timeline_notes}</p>}
-            </div>
-          </Section>
-        )}
-
-        {/* Risk Factors */}
-        {risks.length > 0 && (
-          <Section title="Risk Factors">
+        {/* Risk Factors (compact) */}
+        {(Array.isArray(risks) ? risks : []).length > 0 && (
+          <div className="rounded-lg border bg-white p-4">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Risk Factors</h4>
             <ul className="space-y-1">
-              {(Array.isArray(risks) ? risks : []).map((risk: string, i: number) => (
+              {(Array.isArray(risks) ? risks : []).map((risk, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
-                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
                   {risk}
                 </li>
               ))}
             </ul>
-          </Section>
+          </div>
         )}
 
-        {/* China Sourcing */}
-        {china.explanation && (
-          <Section title="China Sourcing Analysis">
-            <div className="flex items-center gap-2 mb-2">
-              <span className={`inline-block h-2.5 w-2.5 rounded-full ${china.viable ? "bg-green-500" : "bg-red-500"}`} />
-              <span className="text-sm font-medium">{china.viable ? "Viable" : "Not Viable"}</span>
-            </div>
-            <p className="text-sm">{china.explanation}</p>
+        {/* ── TIER 4: Expandable Details ── */}
+        <button
+          onClick={() => setShowDetails(!showDetails)}
+          className="flex items-center gap-2 text-xs font-medium text-blue-700 hover:text-blue-900 transition-colors w-full justify-center py-2 rounded-md border border-dashed border-blue-300 hover:bg-blue-50"
+        >
+          {showDetails ? "Hide" : "Show"} Full Details
+          <svg className={`h-3.5 w-3.5 transition-transform ${showDetails ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+
+        {showDetails && (
+          <div className="space-y-4 animate-fade-in">
+            {/* Scope of Work */}
+            {(data.scopeOfWork || data.scope_of_work || summary.scope_of_work) && (
+              <DetailSection title="Scope of Work">
+                <p className="text-sm">{data.scopeOfWork || data.scope_of_work || summary.scope_of_work}</p>
+              </DetailSection>
+            )}
+
+            {/* Technical Requirements */}
+            {tech.materials?.length > 0 && (
+              <DetailSection title="Technical Requirements">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-1">
+                    {tech.materials.map((m: string) => (
+                      <Badge key={m} variant="outline" className="text-xs">{m}</Badge>
+                    ))}
+                  </div>
+                  {tech.measurements && <p className="text-sm"><span className="text-muted-foreground">Measurements:</span> {tech.measurements}</p>}
+                  {tech.compliance?.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {tech.compliance.map((c: string) => (
+                        <Badge key={c} variant="outline" className="text-xs bg-violet-50 text-violet-700 border-violet-200">{c}</Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </DetailSection>
+            )}
+
+            {/* Qualification Requirements */}
+            {(quals.certifications?.length > 0 || quals.bonding || (quals.experience_years && quals.experience_years !== "not specified")) && (
+              <DetailSection title="Qualification Requirements">
+                <div className="space-y-1 text-sm">
+                  {quals.experience_years && quals.experience_years !== "not specified" && (
+                    <p><span className="text-muted-foreground">Experience:</span> {quals.experience_years}</p>
+                  )}
+                  {quals.bonding && <p><span className="text-muted-foreground">Bonding:</span> {quals.bonding}</p>}
+                  {quals.insurance_min && quals.insurance_min !== "not specified" && (
+                    <p><span className="text-muted-foreground">Insurance:</span> {quals.insurance_min}</p>
+                  )}
+                  {quals.labor_requirements && <p><span className="text-muted-foreground">Labor:</span> {quals.labor_requirements}</p>}
+                  {quals.certifications?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {quals.certifications.map((c: string) => (
+                        <Badge key={c} variant="outline" className="text-xs">{c}</Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </DetailSection>
+            )}
+
+            {/* China Sourcing Restrictions */}
             {china.restrictions?.length > 0 && (
-              <div className="mt-2">
-                <p className="text-xs font-medium text-muted-foreground">Restrictions</p>
-                <ul className="text-sm mt-1 space-y-1">
-                  {china.restrictions.map((r: string, i: number) => <li key={i}>- {r}</li>)}
+              <DetailSection title="China Sourcing Restrictions">
+                <ul className="text-sm space-y-1">
+                  {china.restrictions.map((r: string, i: number) => <li key={i} className="flex items-start gap-2"><span className="mt-1.5 h-1 w-1 rounded-full bg-red-400 shrink-0" />{r}</li>)}
                 </ul>
-              </div>
-            )}
-            {china.lead_time_concern && (
-              <p className="text-sm mt-1 text-muted-foreground">{china.lead_time_concern}</p>
-            )}
-          </Section>
-        )}
-
-        {/* Recommended Action */}
-        {(summary.recommended_action || data.businessFitExplanation || data.business_fit_explanation) && (
-          <div className="rounded-lg border-2 border-blue-300 bg-blue-50 p-4">
-            <p className="text-xs font-medium text-blue-800 mb-1">Recommended Action</p>
-            <p className="text-sm text-blue-900">{summary.recommended_action || data.businessFitExplanation || data.business_fit_explanation}</p>
-          </div>
-        )}
-
-        {/* Business Fit */}
-        {feasibility.key_advantages?.length > 0 && (
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <p className="text-xs font-medium text-emerald-700 mb-2">Key Advantages</p>
-              <ul className="space-y-1">
-                {feasibility.key_advantages.map((a: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-emerald-800">
-                    <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" /> {a}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            {feasibility.key_concerns?.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-amber-700 mb-2">Key Concerns</p>
-                <ul className="space-y-1">
-                  {feasibility.key_concerns.map((c: string, i: number) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-amber-800">
-                      <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" /> {c}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              </DetailSection>
             )}
           </div>
         )}
 
-        {(data.analysisModel || data.analysis_model) && (
-          <p className="text-xs text-muted-foreground text-right">
-            Model: {data.analysisModel || data.analysis_model}
-          </p>
-        )}
+        {/* Footer metadata */}
+        <div className="flex items-center justify-between pt-2 border-t text-[10px] text-muted-foreground">
+          <span>
+            {analyzedAt && `Analyzed ${new Date(analyzedAt).toLocaleDateString()}`}
+            {model && ` · ${model === "fallback_rule_based" ? "Rule-based" : model}`}
+          </span>
+          <span className="flex items-center gap-1">
+            <Sparkles className="h-3 w-3" /> BidToGo AI
+          </span>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border bg-white p-4">
+    <div className="rounded-lg border bg-slate-50/50 p-4">
       <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{title}</h4>
       {children}
     </div>
   );
 }
-/* eslint-enable */

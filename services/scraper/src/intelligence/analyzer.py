@@ -33,7 +33,9 @@ Your job is to analyze tender/bid documents and opportunity descriptions to prod
 - Sources products from China for North American supply/install projects
 - Focuses on commercial projects: hospitals, schools, hotels, government buildings, multi-residential
 
-You must produce actionable intelligence that helps the company decide whether to pursue the opportunity."""
+You must produce actionable intelligence that helps the company decide whether to pursue the opportunity.
+
+Be concise and direct. Avoid generic filler. Every sentence should help the reader make a decision in under 30 seconds."""
 
 _ANALYSIS_PROMPT = """Analyze this tender/bid opportunity and produce a JSON response with the following structure. Be specific and actionable.
 
@@ -51,8 +53,9 @@ DOCUMENT CONTENT (if available):
 
 Respond with ONLY valid JSON in this exact structure:
 {{
+  "one_line_verdict": "One sentence: [Pursue/Review/Skip] — reason this matters to a window covering company",
   "project_overview": "2-3 sentence summary of the project",
-  "scope_of_work": "Detailed description of what is being procured/contracted",
+  "scope_of_work": "Concise description of what is being procured/contracted",
   "scope_type": "One of: supply_only, install_only, supply_and_install, design_build, consulting, mixed, unclear",
   "technical_requirements": {{
     "materials": ["List of specific materials, products, or specifications mentioned"],
@@ -100,7 +103,7 @@ Respond with ONLY valid JSON in this exact structure:
     "restrictions": ["List any sourcing restrictions"],
     "lead_time_concern": "Is timeline compatible with China manufacturing + shipping?"
   }},
-  "recommended_action": "One paragraph summarizing whether to pursue and what steps to take"
+  "recommended_action": "One concise sentence: the single most important next step if pursuing"
 }}"""
 
 
@@ -202,7 +205,9 @@ class TenderAnalyzer:
         )
 
         is_relevant = score >= 40
+        rec = "review_carefully" if is_relevant else "skip"
         return {
+            "one_line_verdict": f"{'Review' if is_relevant else 'Skip'} — {'possible industry fit based on keywords' if is_relevant else 'no clear industry fit detected'}",
             "project_overview": f"Tender: {title}",
             "scope_of_work": desc[:500] if desc else "No description available",
             "scope_type": "unclear",
@@ -226,7 +231,7 @@ class TenderAnalyzer:
             },
             "feasibility_assessment": {
                 "feasibility_score": score,
-                "recommendation": "review_carefully" if is_relevant else "skip",
+                "recommendation": rec,
                 "business_fit_explanation": breakdown.get("business_fit_explanation", ""),
                 "key_concerns": [],
                 "key_advantages": breakdown.get("primary_matches", []),

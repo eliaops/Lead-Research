@@ -248,6 +248,121 @@ export interface CrawlLogEntry {
   createdAt: string;
 }
 
+// ─── AI Intelligence types ───
+
+export interface IntelligenceFeasibility {
+  feasibility_score?: number;
+  recommendation?: string;
+  business_fit_explanation?: string;
+  key_concerns?: string[];
+  key_advantages?: string[];
+}
+
+export interface IntelligenceChinaSourcing {
+  viable?: boolean;
+  explanation?: string;
+  restrictions?: string[];
+  lead_time_concern?: string;
+}
+
+export interface IntelligenceWCR {
+  is_relevant?: boolean;
+  relevance_explanation?: string;
+  specific_products?: string[];
+  estimated_scope_percentage?: number;
+}
+
+export interface IntelligenceTechReqs {
+  materials?: string[];
+  measurements?: string;
+  compliance?: string[];
+  specialized_needs?: string[];
+}
+
+export interface IntelligenceQualReqs {
+  experience_years?: string;
+  certifications?: string[];
+  insurance_min?: string;
+  labor_requirements?: string;
+  bonding?: string;
+  security_clearance?: string;
+  other?: string[];
+}
+
+export interface IntelligenceDates {
+  posting_date?: string | null;
+  closing_date?: string | null;
+  site_visit_date?: string | null;
+  pre_bid_meeting?: string | null;
+  project_start?: string | null;
+  project_completion?: string | null;
+  timeline_notes?: string;
+}
+
+export interface IntelligenceSummary {
+  one_line_verdict?: string;
+  project_overview?: string;
+  scope_of_work?: string;
+  scope_type?: string;
+  technical_requirements?: IntelligenceTechReqs;
+  qualification_requirements?: IntelligenceQualReqs;
+  critical_dates?: IntelligenceDates;
+  risk_factors?: string[];
+  feasibility_assessment?: IntelligenceFeasibility;
+  window_covering_relevance?: IntelligenceWCR;
+  china_sourcing_analysis?: IntelligenceChinaSourcing;
+  recommended_action?: string;
+}
+
+export interface TenderIntelligence {
+  id?: string;
+  opportunityId?: string;
+  projectOverview?: string;
+  project_overview?: string;
+  scopeOfWork?: string;
+  scope_of_work?: string;
+  scopeType?: string;
+  scope_type?: string;
+  technicalRequirements?: IntelligenceTechReqs;
+  technical_requirements?: IntelligenceTechReqs;
+  qualificationReqs?: IntelligenceQualReqs;
+  qualification_reqs?: IntelligenceQualReqs;
+  criticalDates?: IntelligenceDates;
+  critical_dates?: IntelligenceDates;
+  riskFactors?: string[];
+  risk_factors?: string[];
+  feasibilityScore?: number;
+  feasibility_score?: number;
+  recommendationStatus?: string;
+  recommendation_status?: string;
+  businessFitExplanation?: string;
+  business_fit_explanation?: string;
+  chinaSourceAnalysis?: IntelligenceChinaSourcing | string;
+  china_source_analysis?: IntelligenceChinaSourcing | string;
+  intelligenceSummary?: IntelligenceSummary;
+  intelligence_summary?: IntelligenceSummary;
+  analysisModel?: string;
+  analysis_model?: string;
+  analyzedAt?: string;
+  analyzed_at?: string;
+}
+
+export interface IntelligenceResponse {
+  opportunity: Record<string, unknown>;
+  intelligence: TenderIntelligence | null;
+  documents: Array<{
+    id: string;
+    title?: string;
+    url: string;
+    fileType?: string;
+    fileSizeBytes?: number;
+    pageCount?: number;
+    downloadedAt?: string;
+    docCategory?: string;
+    textExtracted?: boolean;
+  }>;
+}
+
 export interface SavedSearch {
   id: string;
   name: string;
