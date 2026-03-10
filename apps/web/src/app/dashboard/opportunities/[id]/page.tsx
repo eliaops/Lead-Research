@@ -432,10 +432,10 @@ export default function OpportunityDetailPage() {
                   if (!desc) return <p className="text-muted-foreground">No description available.</p>;
                   if (desc.startsWith("http://") || desc.startsWith("https://")) {
                     return (
-                      <div className="rounded-md border border-dashed p-4 text-center">
-                        <p className="text-sm text-muted-foreground mb-2">Description available on the source website</p>
-                        <a href={desc} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline flex items-center justify-center gap-1">
-                          <ExternalLink className="h-3.5 w-3.5" /> View on SAM.gov
+                      <div className="rounded-md border border-dashed p-3 text-center">
+                        <p className="text-xs text-muted-foreground mb-1.5">Full description available on the source website</p>
+                        <a href={opp.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1">
+                          <ExternalLink className="h-3 w-3" /> View Original Listing
                         </a>
                       </div>
                     );

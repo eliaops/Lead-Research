@@ -76,11 +76,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {/* Brand */}
         <div className="flex h-14 items-center gap-2.5 px-4 shrink-0">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-              <path d="M14 2v6h6" />
-              <circle cx="11" cy="14" r="3" />
-              <path d="m14 17 2 2" />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" className="h-5 w-5">
+              <rect x="6" y="6" width="14" height="3.5" rx="1.2" fill="#fff" opacity="0.35"/>
+              <rect x="6" y="11.5" width="17" height="3.5" rx="1.2" fill="#fff" opacity="0.55"/>
+              <rect x="6" y="17" width="17" height="3.5" rx="1.2" fill="#fff" opacity="0.85"/>
+              <path d="M13 23.5l5.5-2.5-5.5-2.5" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
           {!collapsed && (
