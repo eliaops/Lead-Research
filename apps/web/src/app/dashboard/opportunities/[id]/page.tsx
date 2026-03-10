@@ -181,17 +181,18 @@ export default function OpportunityDetailPage() {
     }
   }
 
+  const backLink = (
+    <Link href="/dashboard/opportunities" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <ArrowLeft className="h-3.5 w-3.5" /> Opportunities
+    </Link>
+  );
+
   if (loading) {
     return (
-      <div className="space-y-6 animate-fade-in">
-        <Link
-          href="/dashboard/opportunities"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to Opportunities
-        </Link>
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-4">
+        {backLink}
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       </div>
     );
@@ -199,39 +200,21 @@ export default function OpportunityDetailPage() {
 
   if (error === "not_found") {
     return (
-      <div className="space-y-6 animate-fade-in">
-        <Link
-          href="/dashboard/opportunities"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to Opportunities
-        </Link>
-        <Card>
-          <CardContent className="p-12 text-center">
-            <h2 className="text-lg font-semibold">Opportunity Not Found</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              The opportunity you&apos;re looking for doesn&apos;t exist or has been removed.
-            </p>
-          </CardContent>
-        </Card>
+      <div className="space-y-4">
+        {backLink}
+        <div className="rounded-lg border p-10 text-center">
+          <h2 className="text-base font-semibold">Opportunity Not Found</h2>
+          <p className="mt-1 text-xs text-muted-foreground">This opportunity doesn&apos;t exist or has been removed.</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="space-y-6 animate-fade-in">
-        <Link
-          href="/dashboard/opportunities"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to Opportunities
-        </Link>
-        <Card>
-          <CardContent className="p-6 text-center text-sm text-destructive">
-            {error}
-          </CardContent>
-        </Card>
+      <div className="space-y-4">
+        {backLink}
+        <div className="rounded-lg border p-6 text-center text-sm text-destructive">{error}</div>
       </div>
     );
   }
@@ -245,96 +228,66 @@ export default function OpportunityDetailPage() {
   const semanticMatches: string[] = (breakdown.semantic_matches as string[]) ?? [];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <Link
-        href="/dashboard/opportunities"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back to Opportunities
-      </Link>
+    <div className="space-y-4">
+      {backLink}
 
-      {/* Header */}
+      {/* Header — compact + bold */}
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={statusVariant[opp.status] ?? "outline"} className="text-xs">
+        <div className="min-w-0">
+          <h1 className="text-lg font-bold tracking-tight leading-snug">{opp.title}</h1>
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            <Badge variant={statusVariant[opp.status] ?? "outline"} className="text-2xs">
               {opp.status.toUpperCase()}
             </Badge>
-            <span
-              className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold ${getRelevanceColor(opp.relevanceScore)}`}
-            >
-              Score: {opp.relevanceScore}
+            <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-2xs font-bold ${getRelevanceColor(opp.relevanceScore)}`}>
+              {opp.relevanceScore}
             </span>
-            <span
-              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${getBucketColor(opp.relevanceBucket)}`}
-            >
+            <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-2xs font-medium ${getBucketColor(opp.relevanceBucket)}`}>
               {getBucketLabel(opp.relevanceBucket)}
             </span>
-            <span
-              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${getWorkflowColor(opp.workflowStatus)}`}
-            >
+            <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-2xs font-medium ${getWorkflowColor(opp.workflowStatus)}`}>
               {getWorkflowLabel(opp.workflowStatus)}
             </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">{opp.title}</h1>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-1.5">
             {opp.organization && (
-              <span className="flex items-center gap-1">
-                <Building2 className="h-3.5 w-3.5" /> {opp.organization}
-              </span>
+              <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> {opp.organization}</span>
             )}
             <span className="flex items-center gap-1">
-              <MapPin className="h-3.5 w-3.5" />{" "}
-              {[opp.city, opp.region, opp.country].filter(Boolean).join(", ")}
+              <MapPin className="h-3 w-3" /> {[opp.city, opp.region, opp.country].filter(Boolean).join(", ")}
             </span>
-            <span className="flex items-center gap-1">
-              <Globe className="h-3.5 w-3.5" /> {opp.sourceName}
-            </span>
+            <span className="flex items-center gap-1"><Globe className="h-3 w-3" /> {opp.sourceName}</span>
           </div>
         </div>
-        <Button variant="outline" size="sm" asChild>
-          <a href={opp.sourceUrl} target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="mr-2 h-4 w-4" /> View Original
-          </a>
-        </Button>
+        <a href={opp.sourceUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          <ExternalLink className="h-3 w-3" /> Original
+        </a>
       </div>
 
-      {/* Workflow actions */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground mr-2">Actions:</span>
-            {WORKFLOW_ACTIONS.map((action) => {
-              const isActive = opp.workflowStatus === action.value;
-              return (
-                <button
-                  key={action.value}
-                  onClick={() => handleWorkflowChange(action.value)}
-                  disabled={updatingWorkflow || isActive}
-                  className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50
-                    ${isActive
-                      ? getWorkflowColor(action.value) + " ring-2 ring-offset-1 ring-primary/30"
-                      : "bg-background hover:bg-muted border-input text-muted-foreground"
-                    }`}
-                >
-                  <action.icon className="h-3.5 w-3.5" />
-                  {action.shortLabel}
-                  {isActive && <CheckCircle2 className="h-3 w-3" />}
-                </button>
-              );
-            })}
-          </div>
-          {opp.workflowUpdatedAt && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Status updated {formatDate(opp.workflowUpdatedAt, "MMM d, yyyy h:mm a")}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {/* Workflow actions — inline compact */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-2xs font-medium text-muted-foreground mr-1">Stage:</span>
+        {WORKFLOW_ACTIONS.map((action) => {
+          const isActive = opp.workflowStatus === action.value;
+          return (
+            <button
+              key={action.value}
+              onClick={() => handleWorkflowChange(action.value)}
+              disabled={updatingWorkflow || isActive}
+              className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-2xs font-medium transition-colors disabled:opacity-50 ${
+                isActive ? getWorkflowColor(action.value) + " ring-1 ring-offset-1 ring-primary/20" : "bg-background hover:bg-muted border-input text-muted-foreground"
+              }`}
+            >
+              <action.icon className="h-3 w-3" />
+              {action.shortLabel}
+              {isActive && <CheckCircle2 className="h-2.5 w-2.5" />}
+            </button>
+          );
+        })}
+      </div>
 
-      {/* Action feedback toast */}
       {actionError && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive animate-fade-in">
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {actionError}
         </div>
       )}
@@ -448,9 +401,9 @@ export default function OpportunityDetailPage() {
         </Card>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         {/* Main content */}
-        <div className="space-y-6 lg:col-span-2">
+        <div className="space-y-4 lg:col-span-2">
           {/* Intelligence Panel — shown first when available */}
           {intel?.intelligence && (
             <div id="ai-intelligence">
@@ -460,8 +413,8 @@ export default function OpportunityDetailPage() {
 
           {/* Description */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Description</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Description</CardTitle>
             </CardHeader>
             <CardContent>
               {opp.descriptionSummary && opp.descriptionFull && (
@@ -497,10 +450,10 @@ export default function OpportunityDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Documents (from intelligence + original) */}
+          {/* Documents */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-semibold">
                 Documents ({(intel?.documents?.length || 0) || opp.documents.length})
               </CardTitle>
             </CardHeader>
@@ -511,31 +464,31 @@ export default function OpportunityDetailPage() {
                   return <p className="text-sm text-muted-foreground">No documents attached.</p>;
                 }
                 return (
-                  <div className="space-y-2">
-                    {docs.map((doc: { id: string; title?: string; url: string; fileType?: string; fileSizeBytes?: number; pageCount?: number; downloadedAt?: string; docCategory?: string }) => (
-                      <div
-                        key={doc.id}
-                        className="flex items-center justify-between rounded-md border p-3 hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm font-medium">{doc.title || "Untitled"}</p>
-                            <p className="text-xs text-muted-foreground">
+                  <div className="space-y-1.5">
+                    {docs.map((doc: { id: string; title?: string; url: string; fileType?: string; fileSizeBytes?: number; pageCount?: number; downloadedAt?: string; docCategory?: string }) => {
+                      const ft = (doc.fileType || "").toLowerCase();
+                      const typeColor = ft === "pdf" ? "text-red-500" : ft === "doc" || ft === "docx" ? "text-blue-500" : ft === "xls" || ft === "xlsx" ? "text-green-600" : "text-muted-foreground";
+                      return (
+                        <a
+                          key={doc.id}
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2.5 rounded-md border px-3 py-2 hover:bg-muted/40 transition-colors group"
+                        >
+                          <FileText className={`h-4 w-4 shrink-0 ${typeColor}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">{doc.title || "Untitled"}</p>
+                            <p className="text-2xs text-muted-foreground">
                               {doc.fileType?.toUpperCase() || "FILE"}
                               {doc.fileSizeBytes ? ` · ${formatBytes(doc.fileSizeBytes)}` : ""}
-                              {doc.pageCount ? ` · ${doc.pageCount} pages` : ""}
-                              {doc.downloadedAt ? " · Downloaded" : ""}
+                              {doc.pageCount ? ` · ${doc.pageCount}p` : ""}
                             </p>
                           </div>
-                        </div>
-                        <Button variant="ghost" size="sm" asChild>
-                          <a href={doc.url} target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      </div>
-                    ))}
+                          <Download className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
+                        </a>
+                      );
+                    })}
                   </div>
                 );
               })()}
@@ -544,8 +497,8 @@ export default function OpportunityDetailPage() {
 
           {/* Notes */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Notes</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Notes</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {opp.notes.length === 0 && (
@@ -590,13 +543,13 @@ export default function OpportunityDetailPage() {
         </div>
 
         {/* Sidebar metadata */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Key details */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Details</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Details</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-2.5">
               <MetaRow icon={Hash} label="Solicitation #" value={opp.solicitationNumber} />
               <MetaRow icon={Hash} label="External ID" value={opp.externalId} />
               <MetaRow icon={DollarSign} label="Est. Value" value={formatCurrency(opp.estimatedValue, opp.currency)} />
@@ -617,10 +570,10 @@ export default function OpportunityDetailPage() {
           {/* Contact */}
           {(opp.contactName || opp.contactEmail || opp.contactPhone) && (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Contact</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Contact</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-2">
                 <MetaRow icon={User} label="Name" value={opp.contactName} />
                 <MetaRow icon={Mail} label="Email" value={opp.contactEmail} />
                 <MetaRow icon={Phone} label="Phone" value={opp.contactPhone} />
@@ -630,10 +583,10 @@ export default function OpportunityDetailPage() {
 
           {/* Why this matched */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Why This Matched</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Why This Matched</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Score</span>
                 <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${getRelevanceColor(opp.relevanceScore)}`}>
@@ -755,8 +708,8 @@ export default function OpportunityDetailPage() {
           {/* Industry Tags */}
           {opp.industryTags.length > 0 && (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Industry Tags</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Industry Tags</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-1.5">
@@ -773,8 +726,8 @@ export default function OpportunityDetailPage() {
           {/* Tags from DB */}
           {opp.tags.length > 0 && (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Tags</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Tags</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-1.5">
@@ -803,11 +756,11 @@ function MetaRow({
   value?: string | null;
 }) {
   return (
-    <div className="flex items-start gap-3">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-      <div className="min-w-0">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm break-words">{value || "—"}</p>
+    <div className="flex items-start gap-2">
+      <Icon className="mt-px h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <p className="text-2xs text-muted-foreground">{label}</p>
+        <p className="text-xs font-medium break-words">{value || "—"}</p>
       </div>
     </div>
   );

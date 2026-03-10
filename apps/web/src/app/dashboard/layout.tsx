@@ -9,25 +9,39 @@ import {
   FileSearch,
   Globe,
   Bookmark,
-  ScrollText,
   Settings,
   ChevronLeft,
   ChevronRight,
-  User,
   Search,
   LogOut,
   Sparkles,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/opportunities", label: "Opportunities", icon: FileSearch },
-  { href: "/dashboard/intelligence", label: "AI Intelligence", icon: Sparkles },
-  { href: "/dashboard/sources", label: "Sources", icon: Globe },
-  { href: "/dashboard/saved-searches", label: "Saved Searches", icon: Bookmark },
-  { href: "/dashboard/logs", label: "Logs", icon: ScrollText },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+const NAV_SECTIONS = [
+  {
+    label: "Intelligence",
+    items: [
+      { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+      { href: "/dashboard/opportunities", label: "Opportunities", icon: FileSearch },
+      { href: "/dashboard/intelligence", label: "AI Analysis", icon: Sparkles },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { href: "/dashboard/sources", label: "Sources", icon: Globe },
+      { href: "/dashboard/logs", label: "Crawl Logs", icon: Activity },
+      { href: "/dashboard/saved-searches", label: "Saved Searches", icon: Bookmark },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [
+      { href: "/dashboard/settings", label: "Settings", icon: Settings },
+    ],
+  },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -45,114 +59,150 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
   }
 
+  function isActive(href: string) {
+    if (href === "/dashboard") return pathname === "/dashboard";
+    return pathname.startsWith(href);
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
       <aside
         className={cn(
-          "flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 ease-in-out",
-          collapsed ? "w-16" : "w-64"
+          "flex flex-col bg-sidebar transition-all duration-200 ease-in-out border-r border-sidebar-border",
+          collapsed ? "w-[60px]" : "w-60"
         )}
       >
         {/* Brand */}
-        <div className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
+        <div className="flex h-14 items-center gap-2.5 px-4 shrink-0">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" className="h-5 w-5">
-              <path d="M8 7h10l4 4v12a2 2 0 01-2 2H8a2 2 0 01-2-2V9a2 2 0 012-2z" fill="none" stroke="#fff" strokeWidth="2" strokeLinejoin="round"/>
-              <path d="M18 7v4h4" fill="none" stroke="#fff" strokeWidth="2" strokeLinejoin="round"/>
-              <circle cx="14" cy="17" r="4" fill="none" stroke="#fff" strokeWidth="2"/>
-              <line x1="17" y1="20" x2="21" y2="24" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+              <path d="M14 2v6h6" />
+              <circle cx="11" cy="14" r="3" />
+              <path d="m14 17 2 2" />
             </svg>
           </div>
           {!collapsed && (
-            <span className="text-lg font-semibold tracking-tight">
+            <span className="text-base font-bold text-white tracking-tight">
               BidToGo
             </span>
           )}
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4 scrollbar-thin">
-          {NAV_ITEMS.map((item) => {
-            const isActive =
-              item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-sidebar-accent text-white"
-                    : "text-slate-300 hover:bg-sidebar-accent/50 hover:text-white"
-                )}
-                title={collapsed ? item.label : undefined}
-              >
-                <item.icon className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 py-2">
+          {NAV_SECTIONS.map((section) => (
+            <div key={section.label} className="mb-4">
+              {!collapsed && (
+                <div className="px-3 mb-1.5">
+                  <span className="text-2xs font-semibold uppercase tracking-widest text-sidebar-muted">
+                    {section.label}
+                  </span>
+                </div>
+              )}
+              <div className="space-y-0.5">
+                {section.items.map((item) => {
+                  const active = isActive(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "group flex items-center gap-2.5 rounded-md px-3 py-[7px] text-[13px] font-medium transition-colors relative",
+                        active
+                          ? "bg-sidebar-accent text-white"
+                          : "text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground"
+                      )}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      {active && (
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-blue-400" />
+                      )}
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {!collapsed && <span>{item.label}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        {/* Collapse toggle */}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="flex h-12 items-center justify-center border-t border-white/10 text-slate-400 hover:text-white transition-colors"
-        >
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
+        {/* User + Collapse */}
+        <div className="border-t border-sidebar-border px-2 py-2 shrink-0 space-y-1">
+          {!collapsed && session?.user?.email && (
+            <div className="px-3 py-1.5 mb-1">
+              <p className="text-xs font-medium text-sidebar-foreground/80 truncate">
+                {session.user.name ?? "Admin"}
+              </p>
+              <p className="text-2xs text-sidebar-muted truncate">
+                {session.user.email}
+              </p>
+            </div>
           )}
-        </button>
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="flex items-center gap-2 rounded-md px-3 py-1.5 text-2xs text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/40 transition-colors"
+              title="Sign out"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              {!collapsed && <span>Sign out</span>}
+            </button>
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="rounded-md p-1.5 text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/40 transition-colors"
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        </div>
       </aside>
 
       {/* Main area */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top header */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background px-6">
-          <form onSubmit={handleSearch} className="flex items-center gap-3">
+        <header className="flex h-12 shrink-0 items-center justify-between border-b bg-background px-5">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-sm">
+            <Link href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors text-xs font-medium">
+              BidToGo
+            </Link>
+            {pathname !== "/dashboard" && (
+              <>
+                <span className="text-muted-foreground/40">/</span>
+                <span className="text-xs font-medium capitalize">
+                  {pathname.split("/").filter(Boolean).pop()?.replace(/-/g, " ")}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Search */}
+          <form onSubmit={handleSearch} className="flex items-center">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search opportunities…"
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 w-72 rounded-md border border-input bg-muted/50 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="h-7 w-52 rounded-md border border-input bg-muted/40 pl-8 pr-8 text-xs placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring focus:bg-background transition-colors"
               />
+              <kbd className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-4 items-center rounded border border-input bg-muted px-1 text-2xs text-muted-foreground font-mono">
+                /
+              </kbd>
             </div>
           </form>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 rounded-md px-2 py-1.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                <User className="h-4 w-4" />
-              </div>
-              <div className="hidden text-sm sm:block">
-                <p className="font-medium leading-none">
-                  {session?.user?.name ?? "Admin"}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {session?.user?.email ?? ""}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-              title="Logout"
-            >
-              <LogOut className="h-5 w-5" />
-            </button>
-          </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-muted/30 p-6">
-          {children}
+        <main className="flex-1 overflow-y-auto bg-muted/20 p-5 scrollbar-thin">
+          <div className="animate-fade-in">
+            {children}
+          </div>
         </main>
       </div>
     </div>
