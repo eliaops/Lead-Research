@@ -1,193 +1,168 @@
-# BidToGo — Architectural Rules
+# BidToGo — Technical Rules
 
-These rules define the structural integrity of the system. They must never be violated, regardless of feature urgency or convenience.
-
----
-
-## 1. Project Mission
-
-BidToGo collects publicly available procurement opportunities across North America and scores them for relevance to the window covering industry. Every architectural decision must serve this mission:
-
-- **Speed to insight** — A business owner should go from "open dashboard" to "reviewing scored leads" in under 60 seconds.
-- **Data freshness** — Opportunities must be crawled at least daily, with closing dates tracked to prevent missed deadlines.
-- **Trust in scoring** — The relevance score must be transparent and explainable. Users must understand why a score is high or low.
-- **Ethical data collection** — All data must come from public, authorized sources. No exceptions.
+All architecture, code, scraper, and data rules in one place. Read `project_context.md` first for product vision and current state.
 
 ---
 
-## 2. System Architecture Rules
+## 1. Architecture
 
-### 2.1 Data Pipeline Is Sacred
-
-All opportunity data must flow through this pipeline in order:
+### Data Pipeline (Sacred)
 
 ```
-source website → crawler → parser → normalizer → scorer → deduplicator → database → API → frontend
+source → crawler → parser → normalizer → scorer → deduplicator → database → API → frontend
 ```
 
-**Rules:**
-- No module may bypass the pipeline. A scraper must never write directly to the database without passing through normalization and scoring.
-- The API layer must never modify opportunity data directly. It reads from the database and writes user-generated data (notes, saved searches).
-- The frontend must never fetch data from sources directly. All data comes through the API layer.
+- Scrapers must not write to DB without normalization and scoring.
+- API routes must not modify opportunity data directly — they read from DB and write user-generated data (notes, saved searches).
+- Frontend must not query sources directly — all data comes through API routes.
 
-### 2.2 Service Boundaries
-
-The system has two runtime services with a shared database:
+### Service Boundaries
 
 | Service | Runtime | Responsibility |
 |---------|---------|----------------|
-| **Web App** | Node.js (Next.js) | Dashboard UI, API routes, authentication, database reads/writes via Prisma |
-| **Scraper Service** | Python (FastAPI + Celery) | Crawling, parsing, normalizing, scoring, deduplication, database writes via SQLAlchemy |
+| **Web App** | Node.js (Next.js) | Dashboard UI, API routes, auth, DB via Prisma |
+| **Scraper Service** | Python (FastAPI + Celery) | Crawling, parsing, scoring, AI analysis, DB via SQLAlchemy |
 
-**Rules:**
-- The web app communicates with the scraper service only via HTTP (FastAPI endpoints). Never via shared memory, files, or direct function calls.
-- Both services connect to the same PostgreSQL database. Schema changes must be coordinated — Prisma owns the schema definition; Python uses SQLAlchemy for reads/writes only.
-- Redis is a shared broker. Both services may read/write to Redis, but must use namespaced keys to avoid collisions.
+- Web ↔ scraper communication: HTTP only (FastAPI endpoints).
+- Both share PostgreSQL. Prisma owns the schema definition; Python uses SQLAlchemy for reads/writes.
+- Redis is shared broker. Both use namespaced keys.
 
-### 2.3 Technology Ownership
+### Technology Ownership
 
-| Concern | Owner | Rationale |
-|---------|-------|-----------|
-| Database schema | Prisma (apps/web/prisma/schema.prisma) | Single source of truth for migrations |
-| Full-text search setup | Raw SQL (apps/web/prisma/setup-search.sql) | Prisma cannot define tsvector generated columns |
-| API endpoints | Next.js API Routes (apps/web/src/app/api/) | Co-located with frontend for MVP simplicity |
-| Scraping logic | Python (services/scraper/src/) | Python has the best scraping ecosystem |
-| Relevance scoring | Python (services/scraper/src/utils/scorer.py) | Runs during crawl pipeline, before database insertion |
-| UI components | React + shadcn/ui (apps/web/src/components/) | Tailwind-native, accessible, owned (not a dependency) |
-
----
-
-## 3. Module Separation Rules
-
-### 3.1 Scraper Modules
-
-The scraper service is organized into clearly separated modules:
-
-```
-services/scraper/src/
-├── api/          → FastAPI endpoints (HTTP interface only)
-├── crawlers/     → Page fetching, pagination, rate limiting
-├── parsers/      → HTML → structured data extraction
-├── utils/        → Normalizer, scorer, deduplicator
-├── models/       → Pydantic data models
-├── tasks/        → Celery task definitions and app config
-└── core/         → Config, database connection, logging
-```
-
-**Rules:**
-- Crawlers must not contain parsing logic. They fetch raw HTML and hand it to parsers.
-- Parsers must not contain crawling logic. They receive HTML and return structured data.
-- The normalizer must not contain scoring logic. It cleans data; the scorer evaluates it.
-- The scorer must not contain database logic. It returns a score and breakdown; the pipeline writes to the database.
-- The API layer (`api/`) must not contain business logic. It dispatches tasks and returns status.
-
-### 3.2 Frontend Modules
-
-```
-apps/web/src/
-├── app/api/         → API route handlers (data access only)
-├── app/dashboard/   → Page components (presentation + data fetching)
-├── components/ui/   → Reusable UI primitives (Button, Card, Badge, Input)
-├── lib/             → Shared utilities (Prisma client, auth, helpers)
-└── types/           → TypeScript interfaces shared across the app
-```
-
-**Rules:**
-- API routes must not contain presentation logic. They return JSON.
-- Page components must not contain direct database queries. They fetch from API routes via `fetch()`.
-- UI components must be stateless and reusable. Business logic belongs in page components or hooks.
-- TypeScript types in `types/` must match the API response shapes exactly. These are the contract between API and frontend.
+| Concern | Owner |
+|---------|-------|
+| Database schema | `apps/web/prisma/schema.prisma` (single source of truth) |
+| Full-text search | Raw SQL in `prisma/setup-search.sql` (Prisma can't define tsvector) |
+| API endpoints | Next.js API Routes (`apps/web/src/app/api/`) |
+| Scraping logic | Python (`services/scraper/src/`) |
+| Relevance scoring | Python (`services/scraper/src/utils/scorer.py`) |
+| UI components | React + shadcn/ui (`apps/web/src/components/`) |
 
 ---
 
-## 4. Data Integrity Rules
+## 2. Code Standards
 
-### 4.1 Database Schema
+### General
 
-- The Prisma schema at `apps/web/prisma/schema.prisma` is the single source of truth for the database structure.
-- Schema changes require a clear rationale. Before modifying the schema, document: (a) what is changing, (b) why it is needed, (c) what existing data or queries are affected.
-- Never drop columns or tables without first verifying that no code references them.
-- All tables use UUIDs for primary keys, generated by `gen_random_uuid()`.
-- All timestamps are stored in UTC using `TIMESTAMPTZ`.
-- Nullable fields must have an explicit reason. Default to NOT NULL.
+- Prefer small, targeted changes over large rewrites.
+- Every function does one thing. Every file has a single responsibility.
+- No dead code: no commented-out blocks, no placeholder functions, no unused imports.
+- Shared logic goes in utility modules — never duplicate across files.
 
-### 4.2 Deduplication
+### TypeScript (apps/web/)
 
-Deduplication is a two-layer system. Both layers must be maintained.
+- Strict TypeScript. No `any` — use `unknown` + type guards.
+- `import type { ... }` for type-only imports.
+- API routes: `try/catch` wrapper, Zod validation, parameterized SQL, consistent response shapes (`{ data, total, page }` for lists; `{ error, details }` for errors).
+- Convert Prisma `Decimal` → `Number()`, `Date` → `.toISOString()` in responses.
+- React: `"use client"` for hooks/browser APIs. Handle loading/error/empty states in every data component. Use `cn()` for conditional classes, `lucide-react` for icons, shadcn/ui for primitives.
+- Prisma: import from `@/lib/prisma` singleton. Use `$queryRawUnsafe()` with parameterized placeholders for tsvector queries. Never interpolate user input.
 
-| Layer | Mechanism | Purpose |
-|-------|-----------|---------|
-| Source-level | `UNIQUE(source_id, external_id)` | Same source + same bid number = same record |
-| Content-level | `UNIQUE(fingerprint)` — SHA-256 of `title + source_url` | Catches the same opportunity on different aggregator sites |
+### Python (services/scraper/)
 
-**Rules:**
-- Every opportunity must have a fingerprint before insertion.
-- The fingerprint algorithm must not change without a migration plan for existing records.
-- Upsert behavior: on fingerprint conflict, existing records are preserved (no data loss).
+- Python 3.9+. `from __future__ import annotations` in files using `Type | None`.
+- Pydantic v2 for all cross-module data structures.
+- Type hints on all function signatures.
+- `logging` via project logger — never `print()` in production.
+- `pathlib.Path` for file paths.
 
-### 4.3 Full-Text Search
+### Database
 
-- The `search_vector` tsvector column is a PostgreSQL generated column, not managed by Prisma.
-- It is defined in `apps/web/prisma/setup-search.sql` and must be re-applied after any schema migration that recreates the opportunities table.
-- Search weights: title (A), description_summary (B), description_full (C).
-- API keyword search uses `websearch_to_tsquery('english', $keyword)` — always parameterized, never string-interpolated.
+- Prisma owns the schema. UUIDs for PKs (`gen_random_uuid()`). UTC timestamps (`TIMESTAMPTZ`).
+- Default to NOT NULL. Nullable fields need explicit reason.
+- Never drop columns without checking all references.
+- Additive changes are safe. Destructive changes require migration plan: add new → backfill → update code → drop old.
+- `search_vector` tsvector column defined in `setup-search.sql`, must be re-applied after table recreation. Weights: title (A), summary (B), full (C).
 
-### 4.4 Relevance Scoring
+### API Contracts
 
-- Scores are integers in the range 0–100, stored in `relevance_score`.
-- The scoring breakdown is stored in `relevance_breakdown` as JSONB for transparency.
-- The keyword dictionaries in `services/scraper/src/utils/scorer.py` are the authoritative source for scoring weights.
-- Keyword changes affect all future scores. They do not retroactively change existing scores unless a re-scoring job is run.
-
----
-
-## 5. Backward Compatibility Rules
-
-### 5.1 API Contracts
-
-- API response shapes are defined in `apps/web/src/types/index.ts`. These types serve as the contract between backend and frontend.
-- Existing fields in API responses must not be removed or renamed without updating all consuming frontend components.
-- New fields may be added to API responses without breaking changes.
-- Query parameters may be added but existing parameters must not change meaning.
-
-### 5.2 Database Migrations
-
-- Additive changes (new columns, new tables, new indexes) are safe.
-- Destructive changes (dropping columns, renaming columns, changing types) require a migration plan: (a) add new column, (b) backfill data, (c) update code, (d) drop old column.
-- Never use `prisma db push` in production. Use `prisma migrate` for versioned migrations.
-
-### 5.3 Scraper Adapters
-
-- Adding a new crawler/parser is always safe — it's a new file in `crawlers/` or `parsers/`.
-- Modifying an existing parser must not break the output schema (`OpportunityCreate` Pydantic model).
-- Source configurations in `data/sources.yaml` may be added or modified without code changes.
+- TypeScript types in `apps/web/src/types/index.ts` are the contract between backend and frontend.
+- Existing fields must not be removed/renamed without updating all consumers.
+- New fields may be added without breaking changes.
 
 ---
 
-## 6. Documentation Rules
+## 3. Scraper Rules
 
-### 6.1 What Must Be Documented
+### Safety (Non-Negotiable)
 
-| Change Type | Required Documentation |
-|-------------|----------------------|
-| New API endpoint | Add to README API table and describe query parameters |
-| Schema change | Update `docs/DATABASE.md` and explain rationale |
-| New scraper source | Add entry to `data/sources.yaml` with full metadata |
-| Keyword list change | Note in commit message; explain scoring impact |
-| Architecture change | Update `docs/architecture.md` with new diagrams/flows |
-| New feature | Update PRD feature list in `docs/PRD.md` |
+The scraper must **never**:
+- Access pages behind login, CAPTCHA, paywall, or access control
+- Bypass anti-bot systems or impersonate human browsers
+- Override robots.txt disallow directives
+- Send requests faster than configured rate limit (minimum 1s enforced)
+- Scrape personal data of private individuals
+- Follow links to domains not in the source registry
 
-### 6.2 Documentation Locations
+Before every crawl: check robots.txt (cached 24h), enforce rate limit, verify domain is registered, enforce max_pages.
 
-| File | Purpose |
-|------|---------|
-| `.ai/project_context.md` | Long-term project context for AI assistants |
-| `.ai/rules.md` | This file — architectural rules |
-| `.ai/coding_rules.md` | Code style and implementation patterns |
-| `.ai/scraper_rules.md` | Scraping architecture and safety rules |
-| `.ai/working_protocol.md` | How the AI assistant should behave |
-| `docs/PRD.md` | Product requirements document |
-| `docs/architecture.md` | System architecture and data flows |
-| `docs/DATABASE.md` | Database schema documentation |
-| `data/sources.yaml` | Source registry for scrapers |
-| `README.md` | Quick start, API reference, project overview |
+### User-Agent
+
+```
+BidToGo/1.0 (+https://bidtogo.ca/bot; bot@bidtogo.ca)
+```
+
+### Crawler Design
+
+Crawlers extend `BaseCrawler`. They **fetch pages and handle navigation** — they do not parse HTML, score, or write to DB.
+
+Config-driven via `crawl_config` (listing_url, pagination type, rate_limit_seconds, max_pages, timeout, headers). A generic crawler handles 80% of sources; source-specific crawlers only for unusual navigation. Default: 3s delay, 20 max pages, 30s timeout.
+
+On HTTP 429: exponential backoff. On 404/403: log and skip.
+
+### Parser Design
+
+Parsers extend `BaseParser`. They **extract structured data from HTML** — they do not fetch pages, score, or write to DB.
+
+CSS selectors and XPath as constants at file top or in `crawl_config` — never inline in logic.
+
+Required output fields: `title` (required), `source_url` (required). Everything else optional: `external_id`, `organization`, `description`, `location_raw`, `country`, `region`, `city`, `posted_date`, `closing_date`, `status`, `estimated_value`, `currency`, `category`, `contact_*`, `documents`.
+
+### Normalization
+
+- Dates → Python `datetime` via `python-dateutil`. Store closing dates with timezone (default: source local). Posted dates date-only. Unparseable → `None`.
+- Country → 2-letter ISO (`CA`, `US`). Region → abbreviation (`ON`, `BC`, `TX`). City → title-case, trimmed.
+- Text → strip HTML tags, excess whitespace, control chars. Unicode NFC.
+- Status → enum: open, closed, awarded, cancelled, unknown.
+
+### Deduplication
+
+Two layers: source-level (`UNIQUE(source_id, external_id)`) + content-level (`UNIQUE(fingerprint)` — SHA-256 of `title + source_url`). Every opportunity must have a fingerprint before insertion. Upsert on conflict: preserve existing.
+
+### Logging
+
+Every crawl run creates a `source_runs` record: pending → running → completed/failed, with `pages_crawled`, `opportunities_found/created/updated/skipped`, `error_message`, `duration_ms`.
+
+Log every HTTP request at INFO (`GET url → status (time, size)`). Log errors at ERROR with URL and context. Never log full HTML, credentials, or personal data.
+
+### Adding a New Source
+
+1. Add to `data/sources.yaml` with metadata
+2. Register in database (seed script or dashboard)
+3. Write parser in `services/scraper/src/parsers/` — selectors as constants
+4. Test with saved HTML fixture
+5. Write source-specific crawler only if generic can't handle it
+6. Test end-to-end via FastAPI endpoint
+
+---
+
+## 4. Error Handling
+
+- **API routes**: `try/catch`, structured errors `{ error, details }`, proper HTTP codes (400/404/500), server-side logging with context.
+- **Scrapers**: handle timeouts, HTTP errors, empty/malformed HTML. Retry transient errors (timeout, 503) up to 3× with backoff. Skip permanent errors (404, 403). Always update `source_runs` with failure state.
+- **Frontend**: loading/error/empty states everywhere. Catch `fetch()` failures and show user-friendly messages.
+
+---
+
+## 5. Testing
+
+| Component | Test Type | Priority |
+|-----------|-----------|----------|
+| Relevance scorer | Unit: known inputs → expected scores | High |
+| Normalizer | Unit: date parsing, location extraction | High |
+| Deduplicator | Unit: fingerprint generation | High |
+| Parsers | Unit: saved HTML fixtures → extracted fields | High |
+| API routes | Integration: seeded DB → correct responses | Medium |
+| Frontend | Manual browser testing (future: Playwright E2E) | Medium |
+
+Test fixtures in `services/scraper/tests/fixtures/`. Never make real HTTP requests in tests.
