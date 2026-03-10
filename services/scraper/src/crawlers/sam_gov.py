@@ -1,13 +1,9 @@
 """SAM.gov crawler — US federal contract opportunities.
 
 Uses the SAM.gov public-facing search API to fetch solicitations, presolicitations,
-and combined synopsis/solicitation notices. This is the same API the SAM.gov website
-uses for its public search; no API key is required for read-only access.
-
-The API does not reliably filter by keyword, so we download recent postings
-in bulk and rely on our relevance engine for scoring. This gives broad US
-federal coverage — including GSA, DOD, VA, and civilian agency opportunities
-that may involve furnishings, textiles, and interior fit-out.
+and combined synopsis/solicitation notices. After retrieving listing-level data,
+fetches the detail description text from the SAM.gov notice description endpoint
+and extracts resource links (documents/attachments).
 
 Pagination: limit=100 per page, offset-based.
 """
@@ -17,6 +13,7 @@ from __future__ import annotations
 import re
 import time
 from datetime import datetime, timezone, timedelta
+from typing import Any
 from urllib.parse import urlencode
 
 from src.crawlers.base import BaseCrawler
@@ -213,6 +210,70 @@ class SamGovCrawler(BaseCrawler):
 
         return results
 
+    def _fetch_description(self, description_url: str) -> str:
+        """Fetch the actual description text from the SAM.gov notice description URL."""
+        if not description_url or not description_url.startswith("http"):
+            return ""
+        try:
+            resp = self._http.get(description_url, timeout=15)
+            resp.raise_for_status()
+            content_type = resp.headers.get("content-type", "")
+            if "json" in content_type:
+                data = resp.json()
+                # The API returns {"description": "...actual text..."} or
+                # it may return the text nested differently
+                if isinstance(data, dict):
+                    return (
+                        data.get("description", "")
+                        or data.get("content", "")
+                        or data.get("body", "")
+                        or str(data)
+                    )
+                return str(data)
+            text = resp.text.strip()
+            # Strip HTML tags if present
+            clean = re.sub(r"<[^>]+>", " ", text)
+            clean = re.sub(r"\s+", " ", clean).strip()
+            return clean[:10000]
+        except Exception as exc:
+            self.logger.debug("Failed to fetch description from %s: %s", description_url[:80], exc)
+            return ""
+
+    def _extract_resource_links(self, record: dict) -> list[dict[str, Any]]:
+        """Extract document/attachment metadata from the API record."""
+        docs: list[dict[str, Any]] = []
+        for link in record.get("resourceLinks", []):
+            url = link if isinstance(link, str) else link.get("url", "")
+            if not url:
+                continue
+            title = link.get("title", "") if isinstance(link, dict) else ""
+            if not title:
+                # Derive title from URL filename
+                title = url.rstrip("/").split("/")[-1].split("?")[0]
+            file_type = ""
+            lower_url = url.lower()
+            for ext in (".pdf", ".docx", ".doc", ".xlsx", ".xls", ".zip", ".csv"):
+                if ext in lower_url:
+                    file_type = ext.lstrip(".")
+                    break
+            docs.append({
+                "title": title[:250],
+                "url": url,
+                "file_type": file_type or "link",
+            })
+
+        # Also check for 'additionalInfoLink' or 'links' arrays
+        for link in record.get("links", []):
+            url = link.get("href", "") if isinstance(link, dict) else str(link)
+            if url and url not in [d["url"] for d in docs]:
+                docs.append({
+                    "title": (link.get("rel", "") if isinstance(link, dict) else "")[:250] or "Related Link",
+                    "url": url,
+                    "file_type": "link",
+                })
+
+        return docs
+
     def _parse_record(self, record: dict, pre_filter: bool) -> OpportunityCreate | None:
         title = record.get("title", "").strip()[:250]
         if not title:
@@ -230,6 +291,7 @@ class SamGovCrawler(BaseCrawler):
         office_addr = record.get("officeAddress") or {}
         state_code = office_addr.get("state", "")
         city = office_addr.get("city", "")
+        zip_code = office_addr.get("zipcode", "")
         region = state_code if state_code else None
 
         notice_type = record.get("type", "")
@@ -252,19 +314,44 @@ class SamGovCrawler(BaseCrawler):
         contacts = record.get("pointOfContact", [])
         contact_name = None
         contact_email = None
+        contact_phone = None
         if contacts:
-            primary = contacts[0] if contacts else {}
+            primary = contacts[0]
             contact_name = primary.get("fullName")
             contact_email = primary.get("email")
+            contact_phone = primary.get("phone")
 
         description_url = record.get("description", "")
+
+        # Fetch real description text instead of storing the URL
+        desc_text = ""
+        if description_url and description_url.startswith("http"):
+            desc_text = self._fetch_description(description_url)
+            time.sleep(0.3)
+
+        # Build a rich summary line
+        summary_parts = []
+        if naics:
+            summary_parts.append(f"NAICS: {naics}")
+        if classification:
+            summary_parts.append(f"Classification: {classification}")
+        if notice_type:
+            summary_parts.append(f"Type: {notice_type}")
+        if office_addr.get("city"):
+            addr_str = f"Office: {office_addr.get('city', '')}, {state_code}"
+            if zip_code:
+                addr_str += f" {zip_code}"
+            summary_parts.append(addr_str)
+
+        # Extract document links
+        resource_links = self._extract_resource_links(record)
 
         return OpportunityCreate(
             source_id=self.source_config.id,
             external_id=notice_id or sol_number,
             title=title,
-            description_summary=(f"NAICS: {naics}. Classification: {classification}. Type: {notice_type}.")[:500] if naics else None,
-            description_full=description_url if description_url and description_url.startswith("http") else None,
+            description_summary=". ".join(summary_parts)[:500] if summary_parts else None,
+            description_full=desc_text[:15000] if desc_text else None,
             status=OpportunityStatus.OPEN,
             country="US",
             region=region,
@@ -278,17 +365,20 @@ class SamGovCrawler(BaseCrawler):
             currency="USD",
             contact_name=contact_name,
             contact_email=contact_email,
+            contact_phone=contact_phone,
             source_url=ui_link,
-            has_documents=True,
+            has_documents=len(resource_links) > 0,
             organization_name=org_name,
             raw_data={
-                "parser_version": "samgov_v1",
+                "parser_version": "samgov_v2",
                 "notice_id": notice_id,
                 "naics_code": naics,
                 "classification_code": classification,
                 "notice_type": notice_type,
                 "org_path": org_path,
                 "description_url": description_url,
+                "office_address": office_addr,
+                "resource_links": resource_links,
                 "fetch_timestamp": datetime.now(timezone.utc).isoformat(),
             },
             fingerprint="",

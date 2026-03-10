@@ -464,14 +464,35 @@ export default function OpportunityDetailPage() {
               <CardTitle className="text-base">Description</CardTitle>
             </CardHeader>
             <CardContent>
+              {opp.descriptionSummary && opp.descriptionFull && (
+                <div className="mb-4 flex flex-wrap gap-2 text-xs">
+                  {opp.descriptionSummary.split(". ").filter(Boolean).map((part, i) => (
+                    <span key={i} className="inline-block rounded-md bg-muted px-2 py-1 text-muted-foreground">
+                      {part.replace(/\.$/, "")}
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="prose prose-sm max-w-none text-foreground">
-                {(opp.descriptionFull || opp.descriptionSummary || "No description available.")
-                  .split("\n")
-                  .map((line, i) => (
+                {(() => {
+                  const desc = opp.descriptionFull || opp.descriptionSummary || "";
+                  if (!desc) return <p className="text-muted-foreground">No description available.</p>;
+                  if (desc.startsWith("http://") || desc.startsWith("https://")) {
+                    return (
+                      <div className="rounded-md border border-dashed p-4 text-center">
+                        <p className="text-sm text-muted-foreground mb-2">Description available on the source website</p>
+                        <a href={desc} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline flex items-center justify-center gap-1">
+                          <ExternalLink className="h-3.5 w-3.5" /> View on SAM.gov
+                        </a>
+                      </div>
+                    );
+                  }
+                  return desc.split("\n").map((line, i) => (
                     <p key={i} className={line.startsWith("-") ? "ml-4" : ""}>
                       {line || <br />}
                     </p>
-                  ))}
+                  ));
+                })()}
               </div>
             </CardContent>
           </Card>

@@ -325,6 +325,11 @@ class CrawlPipeline:
             self._result.opportunities_created += 1
             logger.debug("Inserted opportunity: %s", opp.title)
 
+            # Insert documents from raw_data.resource_links if present
+            resource_links = (opp.raw_data or {}).get("resource_links", [])
+            if resource_links and opp.external_id:
+                self._insert_documents(opp.external_id, opp.source_id, resource_links)
+
         except Exception:
             logger.exception("Failed to insert opportunity: %s", opp.title)
             self._result.errors.append(f"Insert failed: {opp.title}")
@@ -347,12 +352,17 @@ class CrawlPipeline:
                         status = :status,
                         closing_date = COALESCE(:closing_date, closing_date),
                         estimated_value = COALESCE(:estimated_value, estimated_value),
+                        contact_name = COALESCE(:contact_name, contact_name),
+                        contact_email = COALESCE(:contact_email, contact_email),
+                        contact_phone = COALESCE(:contact_phone, contact_phone),
+                        has_documents = COALESCE(:has_documents, has_documents),
                         keywords_matched = :keywords_matched,
                         negative_keywords = :negative_keywords,
                         relevance_score = :relevance_score,
                         relevance_bucket = :relevance_bucket,
                         relevance_breakdown = :relevance_breakdown,
                         industry_tags = :industry_tags,
+                        raw_data = COALESCE(:raw_data, raw_data),
                         updated_at = NOW()
                     WHERE id = :id
                 """),
@@ -365,17 +375,27 @@ class CrawlPipeline:
                     "status": opp.status.value if opp.status else "unknown",
                     "closing_date": opp.closing_date,
                     "estimated_value": float(opp.estimated_value) if opp.estimated_value else None,
+                    "contact_name": opp.contact_name,
+                    "contact_email": opp.contact_email,
+                    "contact_phone": opp.contact_phone,
+                    "has_documents": opp.has_documents if opp.has_documents else None,
                     "keywords_matched": opp.keywords_matched,
                     "negative_keywords": opp.negative_keywords,
                     "relevance_score": opp.relevance_score,
                     "relevance_bucket": opp.relevance_bucket,
                     "relevance_breakdown": _safe_json_dumps(opp.relevance_breakdown),
                     "industry_tags": opp.industry_tags,
+                    "raw_data": _safe_json_dumps(opp.raw_data) if opp.raw_data else None,
                 },
             )
             self._session.flush()
             self._result.opportunities_updated += 1
             logger.debug("Updated opportunity %s: %s", opportunity_id, opp.title)
+
+            # Insert any new documents
+            resource_links = (opp.raw_data or {}).get("resource_links", [])
+            if resource_links and opp.external_id:
+                self._insert_documents(opp.external_id, opp.source_id, resource_links)
 
         except Exception:
             logger.exception("Failed to update opportunity %s", opportunity_id)
@@ -384,6 +404,48 @@ class CrawlPipeline:
                 self._session.execute(text("ROLLBACK TO SAVEPOINT opp_update"))
             except Exception:
                 pass
+
+    def _insert_documents(
+        self, external_id: str, source_id: str, docs: list[dict],
+    ) -> None:
+        """Insert document rows for an opportunity, skipping duplicates."""
+        # Look up the opportunity ID by external_id + source_id
+        row = self._session.execute(
+            text("SELECT id FROM opportunities WHERE external_id = :eid AND source_id = :sid LIMIT 1"),
+            {"eid": external_id, "sid": source_id},
+        ).fetchone()
+        if not row:
+            return
+        opp_id = str(row.id)
+
+        for doc in docs:
+            url = doc.get("url", "")
+            if not url:
+                continue
+            # Skip if already exists
+            existing = self._session.execute(
+                text("SELECT id FROM opportunity_documents WHERE opportunity_id = :oid AND url = :url LIMIT 1"),
+                {"oid": opp_id, "url": url},
+            ).fetchone()
+            if existing:
+                continue
+            try:
+                self._session.execute(
+                    text("""
+                        INSERT INTO opportunity_documents (
+                            opportunity_id, title, url, file_type, doc_category
+                        ) VALUES (:oid, :title, :url, :ft, :cat)
+                    """),
+                    {
+                        "oid": opp_id,
+                        "title": doc.get("title", "")[:250],
+                        "url": url,
+                        "ft": doc.get("file_type", "")[:50],
+                        "cat": "source_attachment",
+                    },
+                )
+            except Exception as exc:
+                logger.debug("Failed to insert doc for %s: %s", opp_id, exc)
 
     # ─── Source Run Management ──────────────────────────────
 
