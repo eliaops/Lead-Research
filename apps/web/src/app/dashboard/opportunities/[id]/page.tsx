@@ -792,7 +792,7 @@ function MetaRow({
   );
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// eslint-disable-next-line
 function IntelligencePanel({ data }: { data: any }) {
   const [showDetails, setShowDetails] = useState(false);
 
