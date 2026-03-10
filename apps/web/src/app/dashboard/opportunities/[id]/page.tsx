@@ -473,9 +473,24 @@ export default function OpportunityDetailPage() {
               <MetaRow icon={DollarSign} label="Est. Value" value={formatCurrency(opp.estimatedValue, opp.currency)} />
               <MetaRow icon={Calendar} label="Posted" value={formatDate(opp.postedDate)} />
               <MetaRow icon={Clock} label="Closing" value={formatDate(opp.closingDate, "MMM d, yyyy h:mm a")} />
+              {opp.responseDeadline && (
+                <MetaRow icon={Clock} label="Response Due" value={formatDate(opp.responseDeadline, "MMM d, yyyy h:mm a")} />
+              )}
               <MetaRow icon={Tag} label="Category" value={opp.category} />
+              {opp.naicsName && (
+                <MetaRow icon={Tag} label="NAICS" value={opp.naicsName} />
+              )}
+              {opp.classificationName && (
+                <MetaRow icon={Tag} label="PSC" value={opp.classificationName} />
+              )}
               <MetaRow icon={Building2} label="Project Type" value={opp.projectType} />
+              {opp.setAside && (
+                <MetaRow icon={Tag} label="Set-Aside" value={opp.setAside} />
+              )}
               <MetaRow icon={FileText} label="Addenda" value={String(opp.addendaCount)} />
+              {opp.placeOfPerformance && (
+                <MetaRow icon={MapPin} label="Place of Performance" value={opp.placeOfPerformance} />
+              )}
               {opp.mandatorySiteVisit && (
                 <MetaRow icon={MapPin} label="Site Visit" value={opp.mandatorySiteVisit} />
               )}
@@ -486,7 +501,7 @@ export default function OpportunityDetailPage() {
           </Card>
 
           {/* Contact */}
-          {(opp.contactName || opp.contactEmail || opp.contactPhone) && (
+          {(opp.contactName || opp.contactEmail || opp.contactPhone || opp.officeAddress) && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold">Contact</CardTitle>
@@ -495,6 +510,15 @@ export default function OpportunityDetailPage() {
                 <MetaRow icon={User} label="Name" value={opp.contactName} />
                 <MetaRow icon={Mail} label="Email" value={opp.contactEmail} />
                 <MetaRow icon={Phone} label="Phone" value={opp.contactPhone} />
+                {opp.officeAddress && (
+                  <MetaRow icon={MapPin} label="Office" value={opp.officeAddress} />
+                )}
+                {opp.department && (
+                  <MetaRow icon={Building2} label="Department" value={opp.department} />
+                )}
+                {opp.office && (
+                  <MetaRow icon={Building2} label="Office Name" value={opp.office} />
+                )}
               </CardContent>
             </Card>
           )}

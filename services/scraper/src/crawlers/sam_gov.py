@@ -215,40 +215,124 @@ class SamGovCrawler(BaseCrawler):
         if not description_url or not description_url.startswith("http"):
             return ""
         try:
-            resp = self._http.get(description_url, timeout=15)
+            resp = self._http.get(description_url, timeout=20)
             resp.raise_for_status()
             content_type = resp.headers.get("content-type", "")
+
             if "json" in content_type:
                 data = resp.json()
-                # The API returns {"description": "...actual text..."} or
-                # it may return the text nested differently
                 if isinstance(data, dict):
-                    return (
+                    text = (
                         data.get("description", "")
                         or data.get("content", "")
                         or data.get("body", "")
-                        or str(data)
                     )
-                return str(data)
+                    if text:
+                        clean = re.sub(r"<[^>]+>", " ", text)
+                        clean = re.sub(r"\s+", " ", clean).strip()
+                        return clean[:15000]
+                    return str(data)[:10000]
+                return str(data)[:10000]
+
+            # HTML or plain text response
             text = resp.text.strip()
-            # Strip HTML tags if present
+            if not text:
+                return ""
+            # Strip HTML
             clean = re.sub(r"<[^>]+>", " ", text)
             clean = re.sub(r"\s+", " ", clean).strip()
-            return clean[:10000]
+            return clean[:15000]
         except Exception as exc:
-            self.logger.debug("Failed to fetch description from %s: %s", description_url[:80], exc)
+            self.logger.warning("Failed to fetch description from %s: %s", description_url[:80], exc)
             return ""
 
-    def _extract_resource_links(self, record: dict) -> list[dict[str, Any]]:
-        """Extract document/attachment metadata from the API record."""
+    def _fetch_attachments(self, notice_id: str) -> list[dict[str, Any]]:
+        """Fetch attachment metadata from the SAM.gov opportunity resources API."""
+        if not notice_id:
+            return []
+        url = f"https://sam.gov/api/prod/opps/v3/opportunities/{notice_id}/resources"
+        try:
+            resp = self._http.get(url, timeout=15)
+            if resp.status_code != 200:
+                return []
+            data = resp.json()
+            docs: list[dict[str, Any]] = []
+
+            # Iterate through resources — may be nested under different keys
+            resources = []
+            if isinstance(data, list):
+                resources = data
+            elif isinstance(data, dict):
+                resources = data.get("resources", data.get("attachments", data.get("_embedded", {}).get("opportunityAttachmentList", [])))
+                if not resources and "opportunityAttachmentList" in data:
+                    resources = data["opportunityAttachmentList"]
+
+            for item in resources:
+                if not isinstance(item, dict):
+                    continue
+                name = item.get("name", item.get("fileName", item.get("title", "")))
+                att_type = item.get("type", item.get("mimeType", ""))
+                size = item.get("size", item.get("fileSizeInBytes", item.get("fileSize", None)))
+                access = item.get("accessLevel", item.get("access", ""))
+                resource_id = item.get("resourceId", item.get("attachmentId", item.get("id", "")))
+
+                # Build download URL
+                download_url = item.get("downloadUrl", item.get("url", ""))
+                if not download_url and resource_id:
+                    download_url = f"https://sam.gov/api/prod/opps/v3/opportunities/resources/files/{resource_id}/download"
+
+                if not name and not download_url:
+                    continue
+
+                file_type = ""
+                name_lower = (name or "").lower()
+                for ext in (".pdf", ".docx", ".doc", ".xlsx", ".xls", ".zip", ".csv", ".txt"):
+                    if name_lower.endswith(ext):
+                        file_type = ext.lstrip(".")
+                        break
+
+                doc_entry: dict[str, Any] = {
+                    "title": (name or "Attachment")[:250],
+                    "url": download_url or "",
+                    "file_type": file_type or (att_type[:20] if att_type else "file"),
+                }
+                if size:
+                    try:
+                        doc_entry["file_size_bytes"] = int(size)
+                    except (ValueError, TypeError):
+                        pass
+                if access:
+                    doc_entry["access"] = str(access)[:50]
+
+                docs.append(doc_entry)
+
+            return docs
+        except Exception as exc:
+            self.logger.debug("Failed to fetch attachments for %s: %s", notice_id, exc)
+            return []
+
+    def _extract_resource_links(self, record: dict, notice_id: str = "") -> list[dict[str, Any]]:
+        """Extract document/attachment metadata from the API record + attachments API."""
         docs: list[dict[str, Any]] = []
+        seen_urls: set[str] = set()
+
+        # 1. Try the attachments API first (most reliable for actual files)
+        if notice_id:
+            attachments = self._fetch_attachments(notice_id)
+            for att in attachments:
+                url = att.get("url", "")
+                if url and url not in seen_urls:
+                    seen_urls.add(url)
+                    docs.append(att)
+
+        # 2. Also check resourceLinks from the search result
         for link in record.get("resourceLinks", []):
             url = link if isinstance(link, str) else link.get("url", "")
-            if not url:
+            if not url or url in seen_urls:
                 continue
+            seen_urls.add(url)
             title = link.get("title", "") if isinstance(link, dict) else ""
             if not title:
-                # Derive title from URL filename
                 title = url.rstrip("/").split("/")[-1].split("?")[0]
             file_type = ""
             lower_url = url.lower()
@@ -262,10 +346,11 @@ class SamGovCrawler(BaseCrawler):
                 "file_type": file_type or "link",
             })
 
-        # Also check for 'additionalInfoLink' or 'links' arrays
+        # 3. Check links array
         for link in record.get("links", []):
             url = link.get("href", "") if isinstance(link, dict) else str(link)
-            if url and url not in [d["url"] for d in docs]:
+            if url and url not in seen_urls:
+                seen_urls.add(url)
                 docs.append({
                     "title": (link.get("rel", "") if isinstance(link, dict) else "")[:250] or "Related Link",
                     "url": url,
@@ -285,22 +370,51 @@ class SamGovCrawler(BaseCrawler):
         org_path = record.get("fullParentPathName", "")
         org_name = org_path.split(".")[-1].strip()[:200] if org_path else None
 
+        # --- Dates ---
         posted = _parse_date(record.get("postedDate"))
-        closing = _parse_date(record.get("responseDeadLine"))
+        response_deadline = _parse_date(record.get("responseDeadLine"))
+        archive_date = _parse_date(record.get("archiveDate"))
+        # Use archive/inactive date as closing date; fall back to response deadline
+        closing = archive_date or response_deadline
 
+        # --- Location from officeAddress ---
         office_addr = record.get("officeAddress") or {}
         state_code = office_addr.get("state", "")
         city = office_addr.get("city", "")
         zip_code = office_addr.get("zipcode", "")
         region = state_code if state_code else None
 
+        # Build full office address string
+        addr_parts = []
+        if office_addr.get("streetAddress"):
+            addr_parts.append(office_addr["streetAddress"])
+        if office_addr.get("streetAddress2"):
+            addr_parts.append(office_addr["streetAddress2"])
+        if city:
+            line = city
+            if state_code:
+                line += f", {state_code}"
+            if zip_code:
+                line += f" {zip_code}"
+            addr_parts.append(line)
+        office_address_full = ", ".join(addr_parts) if addr_parts else ""
+
+        # --- Place of Performance ---
+        pop = record.get("placeOfPerformance") or record.get("pop") or {}
+        pop_city = pop.get("city", {}).get("name", "") if isinstance(pop.get("city"), dict) else pop.get("city", "")
+        pop_state = pop.get("state", {}).get("code", "") if isinstance(pop.get("state"), dict) else pop.get("state", "")
+        pop_text = ""
+        if pop_city or pop_state:
+            pop_text = f"{pop_city}, {pop_state}".strip(", ")
+
         notice_type = record.get("type", "")
         naics = record.get("naicsCode", "")
         classification = record.get("classificationCode", "")
+        psc_name = record.get("classificationName", "")
 
         # Pre-filter: skip obvious non-matches to reduce DB volume
         if pre_filter:
-            combined = f"{title} {org_path} {notice_type} {naics}".lower()
+            combined = f"{title} {org_path} {notice_type} {naics} {psc_name}".lower()
             if not _KEYWORD_RE.search(combined):
                 broad_terms = ["construct", "renovat", "building", "facilit", "interior",
                                "maintenance", "repair", "install", "supply", "deliver"]
@@ -311,40 +425,49 @@ class SamGovCrawler(BaseCrawler):
         if not ui_link and notice_id:
             ui_link = f"{_UI_BASE}/{notice_id}/view"
 
+        # --- Contacts ---
         contacts = record.get("pointOfContact", [])
         contact_name = None
         contact_email = None
         contact_phone = None
         if contacts:
             primary = contacts[0]
-            contact_name = primary.get("fullName")
+            contact_name = primary.get("fullName") or primary.get("name")
             contact_email = primary.get("email")
-            contact_phone = primary.get("phone")
+            contact_phone = primary.get("phone") or primary.get("phoneNumber") or primary.get("fax")
 
+        # --- Description ---
         description_url = record.get("description", "")
-
-        # Fetch real description text instead of storing the URL
         desc_text = ""
         if description_url and description_url.startswith("http"):
             desc_text = self._fetch_description(description_url)
             time.sleep(0.3)
 
-        # Build a rich summary line
+        # Build a rich summary from classification data
         summary_parts = []
         if naics:
-            summary_parts.append(f"NAICS: {naics}")
+            naics_name = record.get("naicsName", "")
+            summary_parts.append(f"NAICS: {naics}" + (f" - {naics_name}" if naics_name else ""))
         if classification:
-            summary_parts.append(f"Classification: {classification}")
+            summary_parts.append(f"PSC: {classification}" + (f" - {psc_name}" if psc_name else ""))
         if notice_type:
             summary_parts.append(f"Type: {notice_type}")
-        if office_addr.get("city"):
-            addr_str = f"Office: {office_addr.get('city', '')}, {state_code}"
-            if zip_code:
-                addr_str += f" {zip_code}"
-            summary_parts.append(addr_str)
+        if pop_text:
+            summary_parts.append(f"Place of Performance: {pop_text}")
 
-        # Extract document links
-        resource_links = self._extract_resource_links(record)
+        # --- Documents from search API + attachments API ---
+        resource_links = self._extract_resource_links(record, notice_id)
+        if resource_links:
+            time.sleep(0.3)
+
+        # Build location display from place of performance if available, else office
+        if pop_text:
+            location_raw = pop_text
+        elif city:
+            location_raw = f"{city}, {_STATE_MAP.get(state_code, state_code)}" if city else state_code
+        else:
+            location_raw = state_code
+        location_raw = (location_raw or "")[:200]
 
         return OpportunityCreate(
             source_id=self.source_config.id,
@@ -354,9 +477,9 @@ class SamGovCrawler(BaseCrawler):
             description_full=desc_text[:15000] if desc_text else None,
             status=OpportunityStatus.OPEN,
             country="US",
-            region=region,
-            city=city,
-            location_raw=(f"{city}, {_STATE_MAP.get(state_code, state_code)}" if city else state_code)[:200],
+            region=region or pop_state or None,
+            city=pop_city or city or None,
+            location_raw=location_raw,
             posted_date=posted.date() if posted else None,
             closing_date=closing,
             project_type=notice_type[:250] if notice_type else None,
@@ -370,15 +493,29 @@ class SamGovCrawler(BaseCrawler):
             has_documents=len(resource_links) > 0,
             organization_name=org_name,
             raw_data={
-                "parser_version": "samgov_v2",
+                "parser_version": "samgov_v3",
                 "notice_id": notice_id,
                 "naics_code": naics,
+                "naics_name": record.get("naicsName", ""),
                 "classification_code": classification,
+                "classification_name": psc_name,
                 "notice_type": notice_type,
                 "org_path": org_path,
                 "description_url": description_url,
                 "office_address": office_addr,
+                "office_address_full": office_address_full,
+                "place_of_performance": pop_text,
+                "response_deadline": response_deadline.isoformat() if response_deadline else None,
+                "archive_date": archive_date.isoformat() if archive_date else None,
+                "department": record.get("department", ""),
+                "sub_tier": record.get("subtierAgency", record.get("subTier", "")),
+                "office": record.get("office", ""),
+                "set_aside": record.get("typeOfSetAsideDescription", record.get("setAside", "")),
                 "resource_links": resource_links,
+                "all_contacts": [
+                    {k: v for k, v in c.items() if v}
+                    for c in contacts
+                ] if contacts else [],
                 "fetch_timestamp": datetime.now(timezone.utc).isoformat(),
             },
             fingerprint="",

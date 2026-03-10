@@ -45,6 +45,19 @@ export async function GET(
       return NextResponse.json({ error: "Opportunity not found" }, { status: 404 });
     }
 
+    // Extract enriched fields from rawData
+    const raw = (opp.rawData as Record<string, unknown>) ?? {};
+    const responseDeadline = raw.response_deadline as string | undefined;
+    const officeAddressFull = raw.office_address_full as string | undefined;
+    const placeOfPerformance = raw.place_of_performance as string | undefined;
+    const department = raw.department as string | undefined;
+    const subTier = raw.sub_tier as string | undefined;
+    const office = raw.office as string | undefined;
+    const setAside = raw.set_aside as string | undefined;
+    const allContacts = raw.all_contacts as Array<Record<string, string>> | undefined;
+    const naicsName = raw.naics_name as string | undefined;
+    const classificationName = raw.classification_name as string | undefined;
+
     const detail: OpportunityDetail = {
       id: opp.id,
       title: opp.title,
@@ -83,6 +96,16 @@ export async function GET(
       businessFitExplanation: opp.businessFitExplanation ?? undefined,
       workflowNote: opp.workflowNote ?? undefined,
       workflowUpdatedAt: opp.workflowUpdatedAt ? opp.workflowUpdatedAt.toISOString() : undefined,
+      responseDeadline: responseDeadline ?? undefined,
+      officeAddress: officeAddressFull ?? undefined,
+      placeOfPerformance: placeOfPerformance ?? undefined,
+      department: department ?? undefined,
+      subTier: subTier ?? undefined,
+      office: office ?? undefined,
+      setAside: setAside ?? undefined,
+      naicsName: naicsName ?? undefined,
+      classificationName: classificationName ?? undefined,
+      allContacts: allContacts?.length ? allContacts : undefined,
       documents: opp.documents.map((doc) => ({
         id: doc.id,
         title: doc.title ?? undefined,

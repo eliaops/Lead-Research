@@ -182,6 +182,16 @@ export interface OpportunityDetail extends OpportunitySummary {
   businessFitExplanation?: string;
   workflowNote?: string;
   workflowUpdatedAt?: string;
+  responseDeadline?: string;
+  officeAddress?: string;
+  placeOfPerformance?: string;
+  department?: string;
+  subTier?: string;
+  office?: string;
+  setAside?: string;
+  naicsName?: string;
+  classificationName?: string;
+  allContacts?: Array<Record<string, string>>;
   documents: DocumentItem[];
   notes: NoteItem[];
   tags: string[];
