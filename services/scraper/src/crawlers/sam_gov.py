@@ -93,7 +93,7 @@ class SamGovCrawler(BaseCrawler):
         per_page = cfg.get("per_page", 100)
         days_back = cfg.get("days_back", 30)
         pre_filter = cfg.get("pre_filter_keywords", True)
-        naics_codes = cfg.get("naics_codes", _INDUSTRY_NAICS)
+        naics_codes = cfg.get("naics_codes") or _INDUSTRY_NAICS
 
         self._http.headers.update({
             "User-Agent": (
@@ -188,7 +188,7 @@ class SamGovCrawler(BaseCrawler):
                 self.logger.warning("SAM.gov API error at offset %d: %s", page_offset, exc)
                 break
 
-            records = data.get("opportunitiesData", [])
+            records = data.get("opportunitiesData") or []
             if not records:
                 break
 
@@ -258,14 +258,20 @@ class SamGovCrawler(BaseCrawler):
             data = resp.json()
             docs: list[dict[str, Any]] = []
 
-            # Iterate through resources — may be nested under different keys
-            resources = []
+            resources: list = []
             if isinstance(data, list):
                 resources = data
             elif isinstance(data, dict):
-                resources = data.get("resources", data.get("attachments", data.get("_embedded", {}).get("opportunityAttachmentList", [])))
-                if not resources and "opportunityAttachmentList" in data:
-                    resources = data["opportunityAttachmentList"]
+                resources = (
+                    data.get("resources")
+                    or data.get("attachments")
+                    or (data.get("_embedded") or {}).get("opportunityAttachmentList")
+                    or data.get("opportunityAttachmentList")
+                    or []
+                )
+
+            if not isinstance(resources, list):
+                resources = []
 
             for item in resources:
                 if not isinstance(item, dict):
@@ -326,7 +332,7 @@ class SamGovCrawler(BaseCrawler):
                     docs.append(att)
 
         # 2. Also check resourceLinks from the search result
-        for link in record.get("resourceLinks", []):
+        for link in (record.get("resourceLinks") or []):
             url = link if isinstance(link, str) else link.get("url", "")
             if not url or url in seen_urls:
                 continue
@@ -347,7 +353,7 @@ class SamGovCrawler(BaseCrawler):
             })
 
         # 3. Check links array
-        for link in record.get("links", []):
+        for link in (record.get("links") or []):
             url = link.get("href", "") if isinstance(link, dict) else str(link)
             if url and url not in seen_urls:
                 seen_urls.add(url)
@@ -426,7 +432,7 @@ class SamGovCrawler(BaseCrawler):
             ui_link = f"{_UI_BASE}/{notice_id}/view"
 
         # --- Contacts ---
-        contacts = record.get("pointOfContact", [])
+        contacts = record.get("pointOfContact") or []
         contact_name = None
         contact_email = None
         contact_phone = None
