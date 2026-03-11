@@ -214,6 +214,13 @@ class SamGovCrawler(BaseCrawler):
         """Fetch the actual description text from the SAM.gov notice description URL."""
         if not description_url or not description_url.startswith("http"):
             return ""
+
+        # SAM.gov search API returns URLs on api.sam.gov but the working
+        # endpoint lives under sam.gov/api — rewrite if needed.
+        if description_url.startswith("https://api.sam.gov/"):
+            description_url = description_url.replace(
+                "https://api.sam.gov/", "https://sam.gov/api/", 1
+            )
         try:
             resp = self._http.get(description_url, timeout=20)
             resp.raise_for_status()
