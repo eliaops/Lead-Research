@@ -1,0 +1,34 @@
+# BidToGo — Deploy to Production
+#
+# Trigger: push to main branch (manual or auto)
+#
+# Prerequisites (set these in GitHub repo → Settings → Secrets):
+#   DEPLOY_HOST       — server IP (e.g. 137.184.245.75)
+#   DEPLOY_USER       — SSH user (e.g. deploy)
+#   DEPLOY_SSH_KEY    — private SSH key for the deploy user
+#   DEPLOY_PATH       — repo path on server (e.g. /opt/bidtogo)
+#
+# To enable: remove the `if: false` line below.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    if: false  # ← Remove this line to activate automatic deployments
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH || '/opt/bidtogo' }}
+            bash scripts/deploy.sh
