@@ -33,17 +33,40 @@ else
   echo "0/7  Skipping git pull (SKIP_PULL=1)"
 fi
 
-# ── 1. Check .env exists ────────────────────────────────
+# ── 1. Check .env exists — offer to create if missing ────
 if [ ! -f .env ]; then
-  echo "ERROR: .env file not found."
-  echo "Copy .env.production.example to .env and fill in your values:"
-  echo "  cp .env.production.example .env && nano .env"
+  echo ""
+  echo "══════════════════════════════════════════════════════════"
+  echo " ERROR: .env file not found at $(pwd)/.env"
+  echo "══════════════════════════════════════════════════════════"
+  echo ""
+  echo " Option A — Generate a new .env from template:"
+  echo ""
+  echo "   cp .env.production.example .env"
+  echo "   nano .env"
+  echo ""
+  echo " Option B — Quick-generate with random secrets:"
+  echo ""
+  echo "   cat > .env << 'ENVEOF'"
+  echo "   POSTGRES_PASSWORD=$(openssl rand -hex 16)"
+  echo "   NEXTAUTH_SECRET=$(openssl rand -base64 32)"
+  echo "   NEXTAUTH_URL=https://bidtogo.ca"
+  echo "   SCRAPER_API_KEY=$(openssl rand -hex 16)"
+  echo "   OPENAI_API_KEY=sk-your-key-here"
+  echo "   ADMIN_EMAIL=admin@bidtogo.ca"
+  echo "   ADMIN_PASSWORD=$(openssl rand -hex 8)"
+  echo "   ENVEOF"
+  echo ""
+  echo " Then re-run:  bash scripts/deploy.sh"
+  echo "══════════════════════════════════════════════════════════"
   exit 1
 fi
 
 set -a; source .env; set +a
 
 # ── 2. Validate critical env vars ───────────────────────
+#    These 4 have NO defaults in docker-compose.prod.yml.
+#    If any are missing or placeholder, deployment will fail.
 ERRORS=0
 
 check_var() {
@@ -52,36 +75,39 @@ check_var() {
   local placeholder="${2:-}"
 
   if [ -z "$var_val" ]; then
-    echo "  MISSING: $var_name"
+    echo "  ✗ MISSING:     $var_name"
     ERRORS=$((ERRORS + 1))
   elif [ -n "$placeholder" ] && [ "$var_val" = "$placeholder" ]; then
-    echo "  DEFAULT: $var_name still has placeholder value"
+    echo "  ✗ PLACEHOLDER: $var_name (still set to '$placeholder')"
     ERRORS=$((ERRORS + 1))
+  else
+    echo "  ✓ $var_name"
   fi
 }
 
 echo ""
 echo "1/7  Validating environment..."
+echo ""
+echo "  Critical (no defaults — must be set):"
 check_var "POSTGRES_PASSWORD" "CHANGE_ME_STRONG_PASSWORD"
-check_var "NEXTAUTH_SECRET" "CHANGE_ME_GENERATE_WITH_OPENSSL"
-check_var "SCRAPER_API_KEY" "CHANGE_ME_RANDOM_KEY"
+check_var "NEXTAUTH_SECRET"   "CHANGE_ME_GENERATE_WITH_OPENSSL"
+check_var "SCRAPER_API_KEY"   "CHANGE_ME_RANDOM_KEY"
 check_var "NEXTAUTH_URL"
 
 if [ "$ERRORS" -gt 0 ]; then
   echo ""
-  echo "ERROR: $ERRORS critical env var(s) missing or using defaults."
-  echo "Edit .env and try again."
+  echo "  FATAL: $ERRORS critical variable(s) missing or using placeholder values."
+  echo "  Edit .env and re-run:  nano .env && bash scripts/deploy.sh"
   exit 1
 fi
 
-echo "  All critical vars OK"
 echo ""
-echo "  SCRAPER_API_KEY set:    yes (length ${#SCRAPER_API_KEY})"
-echo "  MERX_EMAIL set:         $([ -n "${MERX_EMAIL:-}" ] && echo yes || echo no)"
-echo "  OPENAI_API_KEY set:     $([ -n "${OPENAI_API_KEY:-}" ] && echo yes || echo no)"
-echo "  AI_DAILY_BUDGET_USD:    ${AI_DAILY_BUDGET_USD:-5}"
-echo "  AI_MONTHLY_BUDGET_USD:  ${AI_MONTHLY_BUDGET_USD:-100}"
-echo "  NEXTAUTH_URL:           ${NEXTAUTH_URL}"
+echo "  Optional (have safe defaults or degrade gracefully):"
+echo "  OPENAI_API_KEY:       $([ -n "${OPENAI_API_KEY:-}" ] && echo "set (AI analysis enabled)" || echo "not set (rule-based fallback only)")"
+echo "  MERX_EMAIL:           $([ -n "${MERX_EMAIL:-}" ] && echo "set" || echo "not set (MERX crawling disabled)")"
+echo "  AI_DAILY_BUDGET_USD:  ${AI_DAILY_BUDGET_USD:-5}"
+echo "  AI_MONTHLY_BUDGET_USD:${AI_MONTHLY_BUDGET_USD:-100}"
+echo "  ADMIN_EMAIL:          ${ADMIN_EMAIL:-admin@bidtogo.ca}"
 
 # ── 3. Build containers ─────────────────────────────────
 echo ""
@@ -98,10 +124,17 @@ echo ""
 echo "3/7  Starting database and redis..."
 $COMPOSE up -d postgres redis
 echo "     Waiting for postgres..."
+WAIT=0
 until $COMPOSE exec -T postgres pg_isready -U "${POSTGRES_USER:-leadharvest}" > /dev/null 2>&1; do
   sleep 2
+  WAIT=$((WAIT + 2))
+  if [ "$WAIT" -ge 60 ]; then
+    echo "     FATAL: PostgreSQL did not become ready within 60s"
+    $COMPOSE logs --tail=20 postgres
+    exit 1
+  fi
 done
-echo "     PostgreSQL is ready."
+echo "     PostgreSQL is ready. (${WAIT}s)"
 
 # ── 5. Run database migrations ──────────────────────────
 echo ""
