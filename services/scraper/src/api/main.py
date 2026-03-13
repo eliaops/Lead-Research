@@ -93,10 +93,20 @@ async def health_check() -> HealthResponse:
 @app.get("/api/diagnostics", dependencies=[Depends(verify_api_key)])
 async def diagnostics() -> dict:
     """Return non-secret config diagnostics for debugging parity issues."""
+    openai_ready = False
+    openai_error = None
+    try:
+        import openai as _oai
+        openai_ready = bool(settings.OPENAI_API_KEY) and hasattr(_oai, "OpenAI")
+    except ImportError:
+        openai_error = "openai package not installed"
     return {
         "scraper_api_key_set": bool(settings.SCRAPER_API_KEY),
         "merx_credentials_available": settings.merx_credentials_available,
         "openai_key_set": bool(settings.OPENAI_API_KEY),
+        "openai_key_length": len(settings.OPENAI_API_KEY),
+        "openai_package_ready": openai_ready,
+        "openai_error": openai_error,
         "database_url_set": bool(settings.DATABASE_URL),
         "redis_url": settings.REDIS_URL,
         "rate_limit": settings.DEFAULT_RATE_LIMIT_SECONDS,

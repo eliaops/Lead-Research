@@ -749,6 +749,7 @@ function IntelligencePanel({ data, onReanalyze, reanalyzing }: { data: any; onRe
     : (data.projectOverview || data.project_overview || rpt.project_overview);
   const analyzedAt: string | undefined = data.analyzedAt || data.analyzed_at || rpt.analyzed_at;
   const model: string | undefined = data.analysisModel || data.analysis_model || rpt.analysis_model;
+  const isFallback: boolean = model === "fallback_rule_based" || rpt.fallback_used === true;
 
   const recColors: Record<string, string> = {
     strongly_pursue: "bg-emerald-600 text-white",
@@ -793,8 +794,31 @@ function IntelligencePanel({ data, onReanalyze, reanalyzing }: { data: any; onRe
 
   return (
     <Card className="border-2 border-blue-200 overflow-hidden">
+      {/* ── FALLBACK WARNING ── */}
+      {isFallback && (
+        <div className="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <div>
+              <span className="text-xs font-semibold text-amber-800">Rule-Based Estimate Only</span>
+              <p className="text-[11px] text-amber-600">This analysis used keyword matching, not AI. Click Re-analyze to generate a full AI report.</p>
+            </div>
+          </div>
+          {onReanalyze && (
+            <button
+              onClick={onReanalyze}
+              disabled={reanalyzing}
+              className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 transition-colors disabled:opacity-50 shrink-0"
+            >
+              {reanalyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              Run AI Analysis
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── DECISION HEADER ── */}
-      <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-5 text-white">
+      <div className={`p-5 text-white ${isFallback ? "bg-gradient-to-r from-slate-700 to-slate-600" : "bg-gradient-to-r from-slate-900 to-slate-800"}`}>
         <div className="flex items-start gap-4">
           {overallScore != null && (
             <div className="flex flex-col items-center gap-1 shrink-0">
@@ -821,7 +845,7 @@ function IntelligencePanel({ data, onReanalyze, reanalyzing }: { data: any; onRe
                   {confidence.replace(/_/g, " ")} confidence
                 </span>
               )}
-              {onReanalyze && (
+              {onReanalyze && !isFallback && (
                 <button
                   onClick={onReanalyze}
                   disabled={reanalyzing}
@@ -1199,11 +1223,15 @@ function IntelligencePanel({ data, onReanalyze, reanalyzing }: { data: any; onRe
         <div className="px-5 py-3 flex items-center justify-between text-[10px] text-muted-foreground bg-slate-50">
           <span>
             {analyzedAt && `Analyzed ${new Date(analyzedAt).toLocaleDateString()}`}
-            {model && ` · ${model === "fallback_rule_based" ? "Rule-based" : model}`}
+            {model && ` · ${isFallback ? "Rule-based fallback" : model}`}
             {isV2 && " · v2.0"}
           </span>
           <span className="flex items-center gap-1 font-medium">
-            <Sparkles className="h-3 w-3" /> BidToGo Intelligence
+            {isFallback ? (
+              <><AlertTriangle className="h-3 w-3 text-amber-500" /> Keyword Estimate</>
+            ) : (
+              <><Sparkles className="h-3 w-3" /> BidToGo AI</>
+            )}
           </span>
         </div>
       </CardContent>

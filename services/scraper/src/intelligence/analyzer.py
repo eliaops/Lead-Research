@@ -18,10 +18,14 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
+import openai
+
 from src.core.config import settings
 from src.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+_openai_available = True
 
 # ──────────────────────────────────────────────────────────────
 # System prompt — role & business context
@@ -249,8 +253,12 @@ class TenderAnalyzer:
             document_text=doc_text or "No documents available",
         )
 
+        logger.info(
+            "Starting OpenAI analysis: model=%s title='%s' desc_len=%d doc_len=%d",
+            self._model, title[:80], len(desc_text), len(doc_text),
+        )
+
         try:
-            import openai
             client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
             response = client.chat.completions.create(
                 model=self._model,
@@ -261,30 +269,50 @@ class TenderAnalyzer:
                 temperature=0.2,
                 max_tokens=3500,
                 response_format={"type": "json_object"},
+                timeout=90,
             )
+
+            usage = response.usage
+            if usage:
+                logger.info(
+                    "OpenAI token usage: prompt=%d completion=%d total=%d",
+                    usage.prompt_tokens, usage.completion_tokens, usage.total_tokens,
+                )
+
             raw = response.choices[0].message.content or "{}"
             result = json.loads(raw)
 
             result["analysis_model"] = self._model
             result["analyzed_at"] = datetime.now(timezone.utc).isoformat()
             result["report_version"] = result.get("report_version", "2.0")
+            result["fallback_used"] = False
 
             verdict = result.get("verdict", {})
             scores = result.get("feasibility_scores", {})
             logger.info(
-                "Tender Intelligence Report complete for '%s': score=%s rec=%s conf=%s",
+                "Tender Intelligence Report complete for '%s': score=%s rec=%s conf=%s model=%s",
                 title,
                 scores.get("overall_score", "?"),
                 verdict.get("recommendation", "?"),
                 verdict.get("confidence", "?"),
+                self._model,
             )
             return result
 
         except json.JSONDecodeError as exc:
-            logger.error("Failed to parse AI response as JSON: %s", exc)
+            logger.error("Failed to parse OpenAI response as JSON: %s", exc)
+            return self._fallback_analysis(title, description)
+        except openai.AuthenticationError as exc:
+            logger.error("OpenAI authentication failed — check OPENAI_API_KEY: %s", exc)
+            return self._fallback_analysis(title, description)
+        except openai.RateLimitError as exc:
+            logger.error("OpenAI rate limit hit: %s", exc)
+            return self._fallback_analysis(title, description)
+        except openai.APITimeoutError as exc:
+            logger.error("OpenAI request timed out: %s", exc)
             return self._fallback_analysis(title, description)
         except Exception as exc:
-            logger.error("AI analysis failed: %s", exc)
+            logger.error("AI analysis failed unexpectedly: %s (type: %s)", exc, type(exc).__name__)
             return self._fallback_analysis(title, description)
 
     def _prepare_documents(self, document_texts: dict[str, str] | None) -> str:
@@ -305,6 +333,7 @@ class TenderAnalyzer:
 
     def _fallback_analysis(self, title: str, description: str | None) -> dict[str, Any]:
         """Rule-based fallback when AI is unavailable."""
+        logger.warning("Using FALLBACK rule-based analysis for '%s' — OpenAI was not used", title[:80])
         from src.utils.scorer import score_opportunity
 
         desc = description or ""
@@ -409,4 +438,5 @@ class TenderAnalyzer:
             },
             "analysis_model": "fallback_rule_based",
             "analyzed_at": datetime.now(timezone.utc).isoformat(),
+            "fallback_used": True,
         }

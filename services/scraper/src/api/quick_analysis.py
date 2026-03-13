@@ -111,6 +111,7 @@ async def run_quick_analysis(req: AnalyzeRequest) -> AnalyzeResponse:
             solicitation_number=opp.solicitation_number,
         )
 
+        fallback_used = result.get("fallback_used", False)
         verdict = result.get("verdict", {})
         scores = result.get("feasibility_scores", {})
         overall = scores.get("overall_score")
@@ -118,6 +119,12 @@ async def run_quick_analysis(req: AnalyzeRequest) -> AnalyzeResponse:
         confidence = verdict.get("confidence", "low")
         analysis_model = result.get("analysis_model", "gpt-4o-mini")
         now = datetime.now(timezone.utc)
+
+        if fallback_used:
+            logger.warning(
+                "Analysis used FALLBACK for opp=%s — OpenAI did not produce the report",
+                req.opportunity_id,
+            )
 
         # Extract flattened fields for DB columns
         biz_fit = result.get("business_fit", {})
