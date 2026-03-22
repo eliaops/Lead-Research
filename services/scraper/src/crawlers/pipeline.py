@@ -227,6 +227,11 @@ class CrawlPipeline:
             logger.warning("Rejected opportunity: invalid source_url — %s", opp.source_url)
             self._result.opportunities_skipped += 1
             return False
+        from src.models.opportunity import OpportunityStatus
+        if opp.status in (OpportunityStatus.CLOSED, OpportunityStatus.AWARDED, OpportunityStatus.CANCELLED):
+            logger.debug("Rejected non-open opportunity: %s (status=%s)", opp.title[:60], opp.status)
+            self._result.opportunities_skipped += 1
+            return False
         return True
 
     def _translate_if_relevant(self, opp: OpportunityCreate) -> dict | None:

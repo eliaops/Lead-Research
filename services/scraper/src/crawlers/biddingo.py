@@ -303,6 +303,14 @@ class BiddingoCrawler(BaseCrawler):
         raw_status = item.get("bidStatus") or ""
         status = _STATUS_MAP.get(raw_status, OpportunityStatus.UNKNOWN)
 
+        if status in (OpportunityStatus.CLOSED, OpportunityStatus.AWARDED, OpportunityStatus.CANCELLED):
+            self._diag.rows_skipped_duplicate += 1
+            return None
+
+        if posted_date and posted_date.year < 2024:
+            self._diag.rows_skipped_duplicate += 1
+            return None
+
         categories = [
             c.get("categoryName", "")
             for c in (item.get("categoryList") or [])
@@ -311,9 +319,9 @@ class BiddingoCrawler(BaseCrawler):
         category_str = "; ".join(categories)[:250] if categories else None
 
         detail_url = (
-            f"https://www.biddingo.com/bid/{buyer_org_id}/{tender_id}"
+            f"https://www.biddingo.com/bid/{buyer_sys_id}/{buyer_org_id}/{tender_id}"
             if tender_id
-            else f"https://www.biddingo.com"
+            else "https://www.biddingo.com"
         )
 
         description = None
