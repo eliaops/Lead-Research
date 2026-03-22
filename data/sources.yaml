@@ -75,12 +75,10 @@ sources:
   listing_pattern: opportunities
   parser_class: BCBidCrawler
   crawl_frequency: daily
-  active: true
+  active: false
   notes: >-
-    British Columbia provincial procurement portal on Jaggaer platform. Uses
-    JavaScript browser-check verification. Cloudscraper bypass attempted; may
-    require Playwright browser automation for full reliability. Covers all
-    provincial ministries and agencies.
+    British Columbia provincial procurement portal on Jaggaer platform. Requires
+    Playwright browser automation. Deactivated until support is added.
   crawl_config:
     crawler_class: bcbid
     rate_limit_seconds: 3
@@ -259,6 +257,26 @@ sources:
   industry_fit_score: 35
   source_priority: high
   listing_path: /api/prod/opportunities/v2/search
+- source_id: bidsandtenders
+  source_name: Bids and Tenders
+  country: CA
+  region: National
+  organization_type: aggregator
+  source_type: aggregator
+  base_url: https://www.bidsandtenders.com
+  listing_pattern: bid-opportunities
+  parser_class: null
+  crawl_frequency: daily
+  active: false
+  notes: >-
+    eSolutions Group platform (ic9.esolg.ca). JS-rendered pages require browser
+    automation. Paid subscription ($165/yr or $45/bid) needed for full document
+    access. ~1000 active projects from 350+ buyer organizations across Canada.
+    Deactivated until Playwright support is added.
+  crawl_config: {}
+  industry_fit_score: 70
+  source_priority: high
+  listing_path: /bid-opportunities/
 - source_id: bidnet_direct
   source_name: BidNet Direct
   country: US

@@ -51,21 +51,10 @@ _SEARCH_KEYWORDS = [
     "privacy curtain",
     "cubicle curtain",
     "hospital curtain",
-    "furniture",
-    "furnishing",
-    "textile",
-    "linen",
-    "bedding",
-    "fabric",
-    "upholstery",
     "FF&E",
+    "furnishing",
     "interior fit-out",
     "tenant improvement",
-    "renovation furnishing",
-    "hospital renovation",
-    "school renovation",
-    "flooring",
-    "carpet",
 ]
 
 _PROVINCE_MAP = {

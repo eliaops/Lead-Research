@@ -32,18 +32,16 @@ const PRIMARY_KEYWORDS = [
 ];
 
 const SECONDARY_KEYWORDS = [
-  "fabric", "textile", "linen", "bedding", "blankets", "sheet", "sheets",
-  "privacy curtains", "cubicle curtains", "healthcare curtain",
-  "soft furnishing", "furnishing", "interior furnishing", "furniture",
-  "FF&E", "hotel linen", "hospital linen", "hospitality linen",
-  "interior finishing", "interior finishings", "interior fit-out",
-  "towel", "duvet", "comforter", "pillow", "mattress cover",
+  "fabric", "textile", "soft furnishing", "soft goods",
+  "furnishing", "interior furnishing", "furniture",
+  "FF&E", "interior finishing", "interior finishings",
+  "interior fit-out", "commercial furnishing", "commercial interiors",
+  "tenant improvement", "office fit-out",
 ];
 
 const CONTEXT_KEYWORDS = [
   "hospital renovation", "school renovation", "hotel renovation",
-  "tenant improvement", "interior fit-out", "furnishing package",
-  "furnishing supply", "linen supply", "textile supply",
+  "tenant improvement", "furnishing package",
   "window treatment replacement", "privacy divider replacement",
   "condo furnishing", "apartment furnishing", "senior living",
   "patient room", "dormitory", "long-term care",
@@ -56,6 +54,9 @@ const NEGATIVE_KEYWORDS = [
   "snow removal", "heavy equipment", "paving", "excavat", "culvert",
   "pharmaceutical", "policing", "ambulance", "demolition only",
   "vehicles", "diesel", "landscaping", "waste management",
+  "laundry", "laundry service", "commercial laundry", "linen rental",
+  "linen service", "linen supply", "dry cleaning", "uniform supply",
+  "towel supply", "bedding supply", "cleaning service",
 ];
 
 export default function SettingsPage() {

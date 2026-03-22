@@ -1,4 +1,4 @@
-"""Relevance Engine v2 — window-covering & textile opportunity intelligence scorer.
+"""Relevance Engine v3 — window-covering focused opportunity intelligence scorer.
 
 Classifies every opportunity into one of four relevance buckets, assigns a
 0–100 score, derives industry tags, and generates a human-readable
@@ -110,40 +110,13 @@ PRIMARY_KEYWORDS: dict[str, int] = {
 }
 
 SECONDARY_KEYWORDS: dict[str, int] = {
-    # ── textile / fabric / linen ──────────
-    "fabric": 25,
-    "textile": 25,
-    "textiles": 25,
-    "linen": 30,
-    "linens": 30,
-    "bedding": 30,
-    "blankets": 25,
-    "blanket": 25,
-    "sheet": 20,
-    "sheets": 20,
-    "bed sheet": 30,
-    "bed sheets": 30,
-    "towel supply": 25,
-    "towel": 20,
-    "towels": 20,
+    # ── textile / fabric (weak standalone signals) ──────────
+    "fabric": 12,
+    "textile": 10,
+    "textiles": 10,
     "soft furnishing": 30,
     "soft furnishings": 30,
-    "hospitality linen": 35,
-    "hotel linen": 35,
-    "healthcare linen": 35,
-    "hospital linen": 35,
-    "bedding supply": 35,
-    "sheet supply": 30,
-    "towel and linen": 30,
-    "laundry linen": 25,
-    "linen rental": 30,
-    "linen service": 30,
-    "pillow": 20,
-    "pillowcase": 20,
-    "duvet": 25,
-    "comforter": 25,
-    "mattress cover": 20,
-    "mattress pad": 20,
+    "soft goods": 25,
     # ── furnishing / FF&E / furniture ──────
     "furniture": 25,
     "furnishing": 20,
@@ -161,10 +134,8 @@ SECONDARY_KEYWORDS: dict[str, int] = {
     "interior fitout": 25,
     "tenant improvement": 20,
     "office fit-out": 20,
-    "interior finishing": 20,
     "interior design": 15,
     "commercial interiors": 20,
-    "soft goods": 25,
     "finish carpentry": 15,
     "millwork and finishing": 15,
 }
@@ -296,6 +267,30 @@ NEGATIVE_KEYWORDS: dict[str, int] = {
     "waste management": 20,
     "garbage": 20,
     "recycling": 15,
+    # laundry / linen / bedding — different business from window coverings
+    "laundry service": 35,
+    "commercial laundry": 35,
+    "industrial laundry": 35,
+    "laundry equipment": 30,
+    "laundry": 20,
+    "linen rental": 30,
+    "linen service": 30,
+    "linen supply": 25,
+    "bed linen": 25,
+    "bed linen supply": 30,
+    "towel supply": 25,
+    "towel service": 25,
+    "dry cleaning": 30,
+    "washing service": 25,
+    "housekeeping": 15,
+    "uniform supply": 20,
+    "uniform rental": 20,
+    "cleaning service": 20,
+    "cleaning supplies": 20,
+    "bedding supply": 20,
+    "sheet supply": 20,
+    "linen and towel": 25,
+    "towel and linen": 25,
 }
 
 # ───────────────────────────────────────────────────────────────────────
@@ -345,20 +340,18 @@ SEMANTIC_PATTERNS = [
     (re.compile(r"(disposable|anti.?microbial|flame.?retardant)\s+curtain", re.I), 40, "specialty curtain"),
 
     # Facility + furnishing compound phrases
-    (re.compile(r"(hotel|motel|resort)\s+.{0,30}(furnish|linen|textile|bedding|curtain|drape)", re.I), 35, "hospitality furnishing"),
-    (re.compile(r"(hospital|healthcare|medical)\s+.{0,30}(furnish|linen|textile|curtain)", re.I), 35, "healthcare furnishing"),
+    (re.compile(r"(hotel|motel|resort)\s+.{0,30}(furnish|curtain|drape|blind|shade|window)", re.I), 35, "hospitality furnishing"),
+    (re.compile(r"(hospital|healthcare|medical)\s+.{0,30}(furnish|curtain|drape|blind|shade)", re.I), 35, "healthcare furnishing"),
     (re.compile(r"(school|university|college|dormitor)\w*\s+.{0,30}(furnish|curtain|blind|shade)", re.I), 30, "education furnishing"),
     (re.compile(r"(apartment|condo|residential)\s+.{0,30}(furnish|blind|shade|curtain|window)", re.I), 30, "residential furnishing"),
-    (re.compile(r"(senior|assisted)\s+(living|care)\s+.{0,30}(furnish|curtain|blind|linen)", re.I), 30, "senior care furnishing"),
+    (re.compile(r"(senior|assisted)\s+(living|care)\s+.{0,30}(furnish|curtain|blind|shade)", re.I), 30, "senior care furnishing"),
     (re.compile(r"(office|commercial)\s+.{0,20}(furnish|blind|shade|window\s+treat)", re.I), 25, "commercial furnishing"),
-    (re.compile(r"(military|base|barracks)\s+.{0,30}(furnish|linen|bedding|curtain)", re.I), 30, "military furnishing"),
-    (re.compile(r"(prison|correctional|detention)\s+.{0,30}(furnish|linen|bedding|curtain)", re.I), 25, "correctional furnishing"),
+    (re.compile(r"(military|base|barracks)\s+.{0,30}(furnish|curtain|drape|blind|shade)", re.I), 30, "military furnishing"),
+    (re.compile(r"(prison|correctional|detention)\s+.{0,30}(furnish|curtain|drape|blind|shade)", re.I), 25, "correctional furnishing"),
 
     # Renovation + interior scope
     (re.compile(r"(interior|room)\s+(renovation|remodel|upgrade)\s+.{0,30}(furnish|finish)", re.I), 20, "interior renovation furnishing"),
     (re.compile(r"(furnish|ff&?e)\w*\s+(package|procurement|supply|contract)", re.I), 30, "furnishing procurement"),
-    (re.compile(r"(linen|textile|fabric)\s+(supply|service|contract|procurement|rental)", re.I), 35, "linen/textile supply"),
-    (re.compile(r"(bedding|towel|sheet)\s+(supply|service|contract|procurement|rental)", re.I), 30, "bedding supply"),
 
     # Installation-specific
     (re.compile(r"(motorized|automated|electric)\s+(shade|blind|curtain|window)", re.I), 45, "motorized window products"),
@@ -376,7 +369,7 @@ SEMANTIC_PATTERNS = [
 # If the opportunity's category field itself signals relevance.
 
 _CATEGORY_PATTERNS = [
-    (re.compile(r"window|blind|shade|curtain|drap|furnish|textile|linen|ff&?e|interior", re.I), 12),
+    (re.compile(r"window|blind|shade|curtain|drap|furnish|textile|ff&?e|interior", re.I), 12),
     (re.compile(r"renovation|remodel|fitout|fit-out|tenant improve", re.I), 5),
 ]
 
@@ -417,8 +410,6 @@ _TAG_RULES = [
     (re.compile(r"drape|drapery", re.I), "drapery"),
     (re.compile(r"window covering|window treatment", re.I), "window coverings"),
     (re.compile(r"fabric|textile|soft goods", re.I), "fabric"),
-    (re.compile(r"linen|towel", re.I), "linen"),
-    (re.compile(r"bedding|bed sheet|sheet supply|blanket|duvet|comforter", re.I), "bedding"),
     (re.compile(r"ff&e|ffe|furniture fixtures", re.I), "FF&E"),
     (re.compile(r"interior fit|fitout|tenant improvement", re.I), "interior fit-out"),
     (re.compile(r"motorized|automated", re.I), "motorized systems"),
@@ -429,7 +420,6 @@ _TAG_RULES = [
     (re.compile(r"school|education|dormitor|university|college", re.I), "school"),
     (re.compile(r"senior|assisted living|nursing home|long.term care", re.I), "senior care"),
     (re.compile(r"track|rail|rod|hardware", re.I), "hardware"),
-    (re.compile(r"pillow|mattress|comforter|duvet", re.I), "bedding"),
 ]
 
 
@@ -462,10 +452,10 @@ def _build_explanation(
 
     if bucket == "irrelevant" and final_score == 0:
         if negative_matches:
-            return "No window covering, textile, or furnishing keywords found. Negative signals detected: {}.".format(
+            return "No window covering or furnishing keywords found. Negative signals detected: {}.".format(
                 ", ".join(negative_matches[:4])
             )
-        return "No window covering, textile, or furnishing relevance detected in the title or description."
+        return "No window covering or furnishing relevance detected in the title or description."
 
     parts = []
 
@@ -497,7 +487,7 @@ def _build_explanation(
 
     # Bucket-level summary prefix
     if bucket == "highly_relevant":
-        prefix = "Strong fit for window covering/textile business."
+        prefix = "Strong fit for window covering business."
     elif bucket == "moderately_relevant":
         prefix = "Potential fit — review recommended."
     elif bucket == "low_relevance":

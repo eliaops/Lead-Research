@@ -28,15 +28,9 @@ _NOTICE_TYPES = "o,p,k,r,s"
 _INDUSTRY_NAICS = [
     "337920",  # Blind and Shade Manufacturing
     "314120",  # Curtain and Linen Mills
-    "314910",  # Textile Bag and Canvas Mills
     "314999",  # All Other Miscellaneous Textile Product Mills
     "337127",  # Institutional Furniture Manufacturing
-    "337211",  # Wood Office Furniture Manufacturing
-    "337212",  # Custom Architectural Woodwork and Millwork Manufacturing
-    "442210",  # Floor Covering Stores
     "423220",  # Home Furnishing Merchant Wholesalers
-    "561720",  # Janitorial Services (linen/textile supply contracts)
-    "812331",  # Linen Supply
     "236220",  # Commercial and Institutional Building Construction
     "238390",  # Other Building Finishing Contractors
     "238990",  # All Other Specialty Trade Contractors
@@ -44,11 +38,10 @@ _INDUSTRY_NAICS = [
 
 _INDUSTRY_KEYWORDS = [
     "blinds", "curtains", "drapery", "window covering", "window treatment",
-    "furnishing", "furniture", "textile", "fabric", "linen", "bedding",
-    "carpet", "flooring", "renovation", "interior", "FF&E",
-    "upholstery", "shade", "cubicle curtain", "privacy curtain",
+    "furnishing", "FF&E", "shade", "cubicle curtain", "privacy curtain",
     "roller shade", "blackout", "motorized shade", "solar shade",
     "window shade", "hospital curtain", "privacy divider",
+    "interior fit-out", "tenant improvement",
 ]
 
 _STATE_MAP = {

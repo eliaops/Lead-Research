@@ -59,28 +59,15 @@ _SEARCH_KEYWORDS = [
     "drapery",
     "window covering",
     "window treatment",
-    "furniture",
-    "furnishing",
-    "textile",
-    "linen",
-    "bedding",
-    "renovation interior",
-    "renovation furnishing",
     "hospital curtain",
     "privacy curtain",
     "cubicle curtain",
-    "FF&E",
     "roller shade",
     "motorized shade",
-    "fabric",
-    "upholstery",
-    "flooring",
-    "carpet",
+    "FF&E",
+    "furnishing",
     "interior fit-out",
     "tenant improvement",
-    "hospital renovation",
-    "school renovation",
-    "hotel renovation",
 ]
 
 _CATEGORY_SEARCHES = [
@@ -91,9 +78,7 @@ _CATEGORY_SEARCHES = [
 ]
 
 _BROAD_KEYWORDS = [
-    "renovation",
-    "interior",
-    "furnishing package",
+    "renovation interior",
 ]
 
 _PROVINCE_MAP = {
