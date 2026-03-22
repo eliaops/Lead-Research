@@ -201,7 +201,7 @@ export const zh = {
     oppsFoundInserted: "发现 / 新增",
     crawlRunHistory: "抓取运行历史",
     noCrawlRuns: "暂无抓取记录",
-    clickToStart: "点击"运行抓取"开始首次抓取。",
+    clickToStart: "点击「运行抓取」开始首次抓取。",
     status: "状态",
     source: "数据源",
     trigger: "触发方式",
