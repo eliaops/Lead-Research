@@ -77,7 +77,7 @@ SOURCES = [
             "fetch_detail": True,
             "rate_limit_seconds": 3,
         },
-        "access_mode": "http",
+        "access_mode": "http_scrape",
         "frequency": "daily",
         "is_active": True,
         "source_priority": "high",
