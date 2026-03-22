@@ -1,16 +1,13 @@
-# BidToGo Local MERX Agent
+# BidToGo Local Agents
 
-Crawls MERX from your local/office machine (where MERX is accessible) and syncs results to the cloud BidToGo instance.
-
-## Why?
-
-MERX blocks datacenter IPs. The cloud app can't crawl MERX directly. This agent runs from a trusted local machine where MERX is normally accessible via browser.
+Local agents run on your machine to interact with procurement platforms that require browser authentication. They sync data with the BidToGo cloud.
 
 ## Setup
 
 ```bash
 cd agent
 pip install -r requirements.txt
+python -m playwright install chromium
 cp .env.example .env
 # Edit .env with your values
 ```
@@ -21,39 +18,56 @@ cp .env.example .env
 |---|---|
 | `CLOUD_API_URL` | Your BidToGo instance URL (e.g. `https://bidtogo.ca`) |
 | `AGENT_API_KEY` | API key for agent authentication (matches server's `AGENT_API_KEY`) |
-| `MERX_EMAIL` | Your MERX account email |
-| `MERX_PASSWORD` | Your MERX account password |
+| `MERX_EMAIL` | MERX account email (for merx_agent.py) |
+| `MERX_PASSWORD` | MERX account password |
+| `BT_EMAIL` | Bids & Tenders subscription email (for bt_agent.py) |
+| `BT_PASSWORD` | Bids & Tenders password |
 
-## Usage
+---
+
+## MERX Agent (merx_agent.py)
+
+Crawls MERX from your local machine (MERX blocks datacenter IPs) and uploads opportunities to BidToGo.
 
 ```bash
-# Check cloud connectivity
-python merx_agent.py --status
-
-# Full run: login → crawl → upload
-python merx_agent.py
-
-# Dry run (crawl but don't upload)
-python merx_agent.py --dry-run
+python merx_agent.py --status    # check connectivity
+python merx_agent.py             # full crawl + upload
+python merx_agent.py --dry-run   # crawl without uploading
 ```
 
-## How it works
+---
 
-1. Agent requests a crawl job from the cloud API
-2. Cloud creates a `source_run` record with status `pending`
-3. Agent logs into MERX using your credentials
-4. Agent searches MERX with industry keywords and categories
-5. Agent extracts listing + detail page data
-6. Agent uploads normalized opportunities to the cloud
-7. Cloud scores, deduplicates, and stores them
-8. Agent reports final status back to cloud
-9. Results appear in the BidToGo dashboard
+## Bids & Tenders Agent (bt_agent.py)
+
+Downloads bid documents for high-relevance opportunities found by BidToGo's cloud crawler, extracts PDFs from ZIPs, uploads to cloud for automatic AI deep analysis.
+
+**Workflow:**
+1. Queries BidToGo cloud for high-relevance B&T opportunities without documents
+2. Logs into your bidsandtenders.ca paid subscription
+3. Navigates to each opportunity's detail page
+4. Downloads the bid documents ZIP
+5. Extracts PDFs/DOCX from the ZIP
+6. Uploads documents to BidToGo cloud API
+7. Cloud automatically triggers AI deep analysis + Qingyan push
+8. You receive the final analysis report
+
+```bash
+python bt_agent.py --status      # check connectivity
+python bt_agent.py --dry-run     # list pending, don't download
+python bt_agent.py               # full run: download + upload + analyze
+python bt_agent.py --headed      # run with visible browser (for debugging)
+```
+
+---
 
 ## Scheduling
 
-Run on a schedule using cron:
+Run agents on a schedule using cron:
 
 ```bash
-# Every 6 hours
+# MERX: every 6 hours
 0 */6 * * * cd /path/to/agent && python merx_agent.py >> merx_agent.log 2>&1
+
+# B&T documents: daily at 10am
+0 10 * * * cd /path/to/agent && python bt_agent.py >> bt_agent.log 2>&1
 ```

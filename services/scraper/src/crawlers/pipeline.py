@@ -444,12 +444,27 @@ class CrawlPipeline:
             except Exception:
                 pass
 
+    _AGENT_DOCUMENT_SOURCES = {"bids and tenders"}
+
     def _maybe_trigger_auto_analysis(self, opp: OpportunityCreate) -> None:
-        """Dispatch auto-analysis for high-relevance new opportunities."""
+        """Dispatch auto-analysis for high-relevance new opportunities.
+
+        Sources in _AGENT_DOCUMENT_SOURCES are skipped here — their documents
+        are downloaded by a local agent, which triggers analysis after upload.
+        """
         if (opp.relevance_score or 0) < 80:
             return
         if not opp.external_id:
             return
+
+        source_name = (self._source_config.name or "").lower()
+        if source_name in self._AGENT_DOCUMENT_SOURCES:
+            logger.info(
+                "Skipping auto-analysis for '%s' source opp (agent handles docs+analysis): %s",
+                self._source_config.name, opp.title[:60],
+            )
+            return
+
         try:
             row = self._session.execute(
                 text("SELECT id FROM opportunities WHERE external_id = :eid AND source_id = :sid LIMIT 1"),

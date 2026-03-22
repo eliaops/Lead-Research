@@ -21,6 +21,7 @@ from src.crawlers.merx import MerxCrawler
 from src.crawlers.novascotia import NovaScotiaCrawler
 from src.crawlers.sam_gov import SamGovCrawler
 from src.crawlers.sasktenders import SaskTendersCrawler
+from src.crawlers.toronto import TorontoCrawler
 from src.crawlers.vancouver import VancouverCrawler
 
 CRAWLER_REGISTRY: dict[str, type[BaseCrawler]] = {
@@ -33,5 +34,6 @@ CRAWLER_REGISTRY: dict[str, type[BaseCrawler]] = {
     "novascotia": NovaScotiaCrawler,
     "sam_gov": SamGovCrawler,
     "sasktenders": SaskTendersCrawler,
+    "toronto": TorontoCrawler,
     "vancouver": VancouverCrawler,
 }
