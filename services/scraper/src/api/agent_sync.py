@@ -442,10 +442,12 @@ async def get_pending_documents(
             text(f"""
                 SELECT o.id, o.external_id, o.title, o.title_zh,
                        o.relevance_score, o.source_url, o.closing_date,
-                       o.organization_name, o.has_documents,
+                       o.has_documents,
+                       org.name as organization_name,
                        s.name as source_name
                 FROM opportunities o
                 JOIN sources s ON o.source_id = s.id
+                LEFT JOIN organizations org ON o.organization_id = org.id
                 WHERE o.relevance_score >= :min_score
                   AND o.has_documents = false
                   AND o.status = 'open'
