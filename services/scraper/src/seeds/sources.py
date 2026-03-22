@@ -172,7 +172,7 @@ SOURCES = [
             "crawler_class": "sasktenders",
             "rate_limit_seconds": 2,
         },
-        "access_mode": "scraper",
+        "access_mode": "http_scrape",
         "frequency": "daily",
         "is_active": True,
         "source_priority": "high",
