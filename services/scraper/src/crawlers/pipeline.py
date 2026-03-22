@@ -523,7 +523,23 @@ class CrawlPipeline:
                 text("""
                     UPDATE sources SET
                         last_crawled_at = :now,
-                        last_run_status = :status
+                        last_run_status = :status,
+                        health_status = (
+                            SELECT CASE
+                                WHEN cnt = 0 THEN 'untested'::"SourceHealthStatus"
+                                WHEN fails::float / cnt > 0.8 THEN 'failing'::"SourceHealthStatus"
+                                WHEN fails::float / cnt > 0.3 THEN 'degraded'::"SourceHealthStatus"
+                                WHEN :status = 'completed' THEN 'healthy'::"SourceHealthStatus"
+                                ELSE 'degraded'::"SourceHealthStatus"
+                            END
+                            FROM (
+                                SELECT
+                                    COUNT(*)::int AS cnt,
+                                    COUNT(*) FILTER (WHERE sr.status = 'failed')::int AS fails
+                                FROM source_runs sr
+                                WHERE sr.source_id = :source_id
+                            ) stats
+                        )
                     WHERE id = :source_id
                 """),
                 {

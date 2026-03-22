@@ -147,17 +147,21 @@ _TIER_RANGES = {
 def crawl_by_fit_tier(tier: str) -> dict[str, Any]:
     """Crawl only sources in a specific industry-fit tier.
 
+    Sources with access_mode='local_authenticated_connector' are skipped —
+    those are handled by the local agent, not the cloud worker.
+
     Args:
         tier: one of 'high', 'medium', 'low'
     """
     lo, hi = _TIER_RANGES.get(tier, (0, 100))
     logger.info("Dispatching crawl tasks for tier=%s (fit_score %d-%d)", tier, lo, hi)
     task_ids: list[dict[str, str]] = []
+    skipped_local: list[str] = []
 
     with get_db() as session:
         rows = session.execute(
             text(
-                "SELECT id, name, industry_fit_score FROM sources "
+                "SELECT id, name, industry_fit_score, access_mode FROM sources "
                 "WHERE is_active = true "
                 "AND industry_fit_score >= :lo AND industry_fit_score <= :hi"
             ),
@@ -165,6 +169,12 @@ def crawl_by_fit_tier(tier: str) -> dict[str, Any]:
         ).fetchall()
 
     for row in rows:
+        access = getattr(row, "access_mode", "http") or "http"
+        if access == "local_authenticated_connector":
+            skipped_local.append(row.name)
+            logger.info("Skipping local-agent source in tier %s: %s", tier, row.name)
+            continue
+
         source_id = str(row.id)
         task = crawl_source.delay(source_id)
         task_ids.append({"source_id": source_id, "task_id": task.id})
@@ -172,5 +182,5 @@ def crawl_by_fit_tier(tier: str) -> dict[str, Any]:
             "Dispatched [%s] crawl for %s (fit=%d)", tier, row.name, row.industry_fit_score
         )
 
-    logger.info("Tier %s: dispatched %d crawl tasks", tier, len(task_ids))
-    return {"tier": tier, "dispatched": task_ids, "count": len(task_ids)}
+    logger.info("Tier %s: dispatched %d crawl tasks (skipped %d local-agent)", tier, len(task_ids), len(skipped_local))
+    return {"tier": tier, "dispatched": task_ids, "count": len(task_ids), "skipped_local_agent": skipped_local}

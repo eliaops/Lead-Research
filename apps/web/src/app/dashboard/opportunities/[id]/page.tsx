@@ -1695,7 +1695,7 @@ function IntelligencePanel({ data, onReanalyze, onDeepAnalyze, reanalyzing }: { 
         {/* Footer */}
         <div className="px-5 py-3 flex items-center justify-between text-[10px] text-muted-foreground bg-slate-50">
           <span>
-            {analyzedAt && `Analyzed ${new Date(analyzedAt).toLocaleDateString()}`}
+            {analyzedAt && `Analyzed ${formatDate(analyzedAt)}`}
             {model && ` · ${isFallback ? "Rule-based fallback" : model}`}
             {isV2 && " · v2.0"}
           </span>

@@ -99,7 +99,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/sources/recalculate", { method: "POST" });
       if (!res.ok) throw new Error("Recalculation failed");
       const body = await res.json();
-      setRecalcMessage(`Updated ${body.sourcesUpdated ?? "?"} sources at ${new Date(body.recalculatedAt).toLocaleTimeString()}.`);
+      setRecalcMessage(`Updated ${body.sourcesUpdated ?? "?"} sources at ${new Intl.DateTimeFormat("en-US", { timeZone: "America/Toronto", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }).format(new Date(body.recalculatedAt))}.`);
     } catch {
       setRecalcMessage("Failed to recalculate source analytics.");
     } finally {

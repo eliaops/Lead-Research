@@ -284,7 +284,7 @@ function IntelligencePage() {
                         {/* Analyzed date */}
                         {item.analyzedAt && (
                           <p className="mt-2 text-[10px] text-muted-foreground">
-                            Analyzed {new Date(item.analyzedAt).toLocaleDateString()} via {item.analysisModel || "rule-based"}
+                            Analyzed {formatDate(item.analyzedAt)} via {item.analysisModel || "rule-based"}
                           </p>
                         )}
                       </div>

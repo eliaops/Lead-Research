@@ -1,18 +1,42 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { format, parseISO } from "date-fns";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+export const APP_TIMEZONE = "America/Toronto";
+
+const PATTERN_OPTIONS: Record<string, Intl.DateTimeFormatOptions> = {
+  "MMM d, yyyy": { month: "short", day: "numeric", year: "numeric" },
+  "MMM d, h:mm a": { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true },
+  "MMM d": { month: "short", day: "numeric" },
+};
 
 export function formatDate(
   date: string | Date | null | undefined,
   pattern = "MMM d, yyyy"
 ): string {
   if (!date) return "—";
-  const d = typeof date === "string" ? parseISO(date) : date;
-  return format(d, pattern);
+  const d = typeof date === "string" ? new Date(date) : date;
+  const opts = PATTERN_OPTIONS[pattern] ?? PATTERN_OPTIONS["MMM d, yyyy"];
+  return new Intl.DateTimeFormat("en-US", { ...opts, timeZone: APP_TIMEZONE }).format(d);
+}
+
+export function formatDateTime(
+  date: string | Date | null | undefined
+): string {
+  if (!date) return "—";
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIMEZONE,
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  }).format(d);
 }
 
 export function formatCurrency(
