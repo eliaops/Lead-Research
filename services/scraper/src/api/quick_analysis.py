@@ -27,14 +27,10 @@ from src.intelligence.analyzer import TenderAnalyzer
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 
-_COST_PER_1K_INPUT: dict[str, float] = {"gpt-4o-mini": 0.00015, "gpt-4o": 0.0025}
-_COST_PER_1K_OUTPUT: dict[str, float] = {"gpt-4o-mini": 0.0006, "gpt-4o": 0.01}
-
-
 def _estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
-    ic = (prompt_tokens / 1000) * _COST_PER_1K_INPUT.get(model, 0.003)
-    oc = (completion_tokens / 1000) * _COST_PER_1K_OUTPUT.get(model, 0.006)
-    return round(ic + oc, 6)
+    rates = {"gpt-4o": (2.50, 10.00), "gpt-4o-mini": (0.15, 0.60)}
+    inp, out = rates.get(model, (2.50, 10.00))
+    return round((prompt_tokens / 1_000_000) * inp + (completion_tokens / 1_000_000) * out, 6)
 
 
 def _check_budget(session: Any) -> tuple[bool, str]:
@@ -119,7 +115,10 @@ async def upload_and_analyze(
     files: list[UploadFile] = File(...),
     opportunity_id: str | None = Form(None),
 ) -> dict:
-    """Upload up to 10 documents and run full AI analysis. Returns Markdown report."""
+    """Upload up to 10 documents and run deep AI analysis (gpt-4o, 16K tokens, ~$0.20-$0.50).
+
+    Returns Markdown report with cost info. Budget cap: $5/analysis.
+    """
     if len(files) > _UPLOAD_MAX_FILES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"最多上传 {_UPLOAD_MAX_FILES} 个文件")
 
@@ -226,7 +225,7 @@ async def upload_and_analyze(
                     {"id": opportunity_id},
                 )
 
-        analyzer = TenderAnalyzer(model="gpt-4o", max_tokens=8000)
+        analyzer = TenderAnalyzer(model="gpt-4o", max_tokens=16000)
         result = analyzer.analyze(
             title=opp_title,
             organization=organization,
@@ -243,18 +242,21 @@ async def upload_and_analyze(
         model = result.get("model", "gpt-4o")
         prompt_tok = result.get("prompt_tokens", 0)
         completion_tok = result.get("completion_tokens", 0)
+        actual_cost = result.get("estimated_cost_usd", 0.0)
         is_fallback = result.get("fallback", False)
         now = datetime.now(timezone.utc)
 
         if not is_fallback:
-            cost = _estimate_cost(model, prompt_tok, completion_tok)
+            cost = actual_cost or _estimate_cost(model, prompt_tok, completion_tok)
             _record_usage(session, opportunity_id or "upload", model, "upload_deep", prompt_tok, completion_tok, cost)
 
         if opportunity_id:
             summary_json = json.dumps({
                 "report_markdown": report_md,
-                "report_version": "4.0",
+                "report_version": "5.0",
                 "documents_analyzed": stored_files,
+                "analysis_cost_usd": actual_cost,
+                "model": model,
             })
 
             existing = session.execute(
@@ -304,6 +306,8 @@ async def upload_and_analyze(
             "report_markdown": report_md,
             "documents_analyzed": stored_files,
             "model": model,
+            "cost_usd": round(actual_cost, 4),
+            "tokens": {"prompt": prompt_tok, "completion": completion_tok},
         }
 
     except HTTPException:

@@ -97,6 +97,8 @@ export default function OpportunityDetailPage() {
   const [miniLoading, setMiniLoading] = useState(false);
   const [pushingReport, setPushingReport] = useState(false);
   const [pushResult, setPushResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [lastCost, setLastCost] = useState<number | null>(null);
+  const [showReanalysisConfirm, setShowReanalysisConfirm] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -181,12 +183,14 @@ export default function OpportunityDetailPage() {
       if (result.status === "error") throw new Error(result.message || "分析失败");
       if (result.status === "budget_exceeded") throw new Error(result.message || "AI 预算已用完，请联系管理员");
 
+      if (result.cost_usd) setLastCost(result.cost_usd);
       setAnalysisPhase("加载结果...");
       await new Promise((r) => setTimeout(r, 500));
       fetchIntelligence();
       fetchDetail();
       setActiveTab("analysis");
       setUploadFiles([]);
+      setShowReanalysisConfirm(false);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "上传分析失败");
     } finally {
@@ -587,21 +591,48 @@ export default function OpportunityDetailPage() {
                       </div>
                     )}
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-2">
-                      <button onClick={handleUploadAnalyze}
-                        disabled={uploading || uploadFiles.length === 0}
-                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                        {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                        {uploading ? "分析中..." : "上传并分析"}
-                      </button>
-                      {uploadFiles.length > 0 && !uploading && (
-                        <button onClick={() => { setUploadFiles([]); setUploadError(null); }}
-                          className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                          清除全部
+                    {/* Re-analysis warning */}
+                    {hasReport && !showReanalysisConfirm && (
+                      <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-amber-900">该项目已有深度分析报告</p>
+                            <p className="text-xs text-amber-700 mt-0.5">
+                              重新分析将产生额外费用（约 $0.20-$0.50/次），且会覆盖现有报告。
+                              除非招标文件有更新或上次分析有遗漏，否则不建议重复分析。
+                            </p>
+                          </div>
+                        </div>
+                        <button onClick={() => setShowReanalysisConfirm(true)}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-amber-400 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 transition-colors">
+                          <RefreshCw className="h-3 w-3" /> 我了解，仍要重新分析
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    {(!hasReport || showReanalysisConfirm) && (
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground bg-muted rounded px-2 py-1">
+                            GPT-4o · 16K tokens · 预计 $0.20-$0.50/次 · 上限 $5
+                          </span>
+                        </div>
+                        <button onClick={handleUploadAnalyze}
+                          disabled={uploading || uploadFiles.length === 0}
+                          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                          {uploading ? "深度分析中..." : hasReport ? "重新分析（覆盖旧报告）" : "上传并深度分析"}
+                        </button>
+                        {uploadFiles.length > 0 && !uploading && (
+                          <button onClick={() => { setUploadFiles([]); setUploadError(null); }}
+                            className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                            清除全部
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -615,7 +646,8 @@ export default function OpportunityDetailPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-[10px] text-muted-foreground">
-                          {analyzedAt && `${formatDate(analyzedAt)}`} · GPT-4o · BidToGo AI
+                          {analyzedAt && `${formatDate(analyzedAt)}`} · GPT-4o
+                          {lastCost != null && ` · $${lastCost.toFixed(2)}`}
                         </span>
                         {pushResult?.ok ? (
                           <span className="inline-flex items-center gap-1 rounded-md bg-violet-100 px-2.5 py-1 text-[10px] font-medium text-violet-700">
